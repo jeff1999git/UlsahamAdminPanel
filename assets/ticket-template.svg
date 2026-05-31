@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 890" width="600" height="890">
+
+  <!-- Green header background -->
+  <rect width="600" height="255" fill="#014421"/>
+
+  <!-- Yellow body with rounded top corners -->
+  <rect x="0" y="225" width="600" height="665" rx="28" ry="28" fill="#FEE715"/>
+  <!-- Fill bottom so only top corners are rounded -->
+  <rect x="0" y="253" width="600" height="637" fill="#FEE715"/>
+
+  <!-- ULSAHAM pixel-style text -->
+  <text x="300" y="132"
+        text-anchor="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-weight="900"
+        font-size="76"
+        fill="#FEE715"
+        letter-spacing="6">ULSAHAM</text>
+
+  <!-- ENTERTAINMENTS pill badge -->
+  <rect x="111" y="159" width="378" height="48" rx="24" ry="24" fill="#FEE715"/>
+  <text x="300" y="191"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="18"
+        fill="#014421"
+        letter-spacing="4">ENTERTAINMENTS</text>
+
+  <!-- ── Event info area (yellow section) ── -->
+
+  <!-- "EVENT TICKET" label -->
+  <text x="300" y="269"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="10"
+        fill="#2d6e3a"
+        letter-spacing="2">E V E N T   T I C K E T</text>
+
+  <!-- Event name placeholder -->
+  <text x="300" y="297"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="22"
+        fill="#000000">[Event Name]</text>
+
+  <!-- Date placeholder -->
+  <text x="300" y="331"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="13"
+        fill="#222222">[Date]</text>
+
+  <!-- Venue placeholder -->
+  <text x="300" y="353"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="12"
+        fill="#333333">[Venue]</text>
+
+  <!-- Divider -->
+  <line x1="109" y1="373" x2="491" y2="373" stroke="#00000025" stroke-width="1"/>
+
+  <!-- Participant section label -->
+  <text x="300" y="393"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="9"
+        fill="#014421"
+        letter-spacing="2">REGISTERED PARTICIPANT</text>
+
+  <!-- Participant name placeholder -->
+  <text x="300" y="423"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="19"
+        fill="#000000">[Participant Name]</text>
+
+  <!-- Admits -->
+  <text x="300" y="451"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="12"
+        fill="#333333">1 ADMIT</text>
+
+  <!-- Ticket code -->
+  <text x="300" y="473"
+        text-anchor="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="10"
+        fill="#666666">ULS-XXXXXXXX</text>
+
+  <!-- ── White QR box ── -->
+  <rect x="99" y="501" width="402" height="274" rx="18" ry="18" fill="#ffffff"/>
+
+  <!-- QR placeholder -->
+  <rect x="200" y="523" width="200" height="200" rx="4" fill="#f0f0f0"/>
+  <text x="300" y="626"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="13"
+        fill="#cccccc">QR CODE</text>
+
+  <!-- Scan instruction -->
+  <text x="300" y="744"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="11"
+        fill="#666666">Scan this code at the entrance</text>
+
+  <!-- ── Footer ── -->
+  <line x1="99" y1="800" x2="501" y2="800" stroke="#00000015" stroke-width="1"/>
+
+  <text x="300" y="826"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="13"
+        fill="#000000">Phone: 9446266011</text>
+
+  <text x="300" y="854"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-weight="700"
+        font-size="13"
+        fill="#000000">Instagram: @ulsaham_</text>
+
+</svg>

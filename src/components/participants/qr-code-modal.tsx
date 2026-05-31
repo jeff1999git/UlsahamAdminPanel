@@ -26,6 +26,8 @@ interface QRCodeModalProps {
   eventName: string
   eventDate: string
   eventVenue: string
+  numberOfParticipants: number
+  bannerImageUrl?: string | null
 }
 
 function wrapText(
@@ -51,6 +53,64 @@ function wrapText(
   return lines
 }
 
+function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.arcTo(x + w, y, x + w, y + r, r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+  ctx.lineTo(x + r, y + h)
+  ctx.arcTo(x, y + h, x, y + h - r, r)
+  ctx.lineTo(x, y + r)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
+}
+
+async function loadImageFromUrl(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    const timer = setTimeout(() => resolve(null), 6000)
+    img.onload = () => { clearTimeout(timer); resolve(img) }
+    img.onerror = () => { clearTimeout(timer); resolve(null) }
+    img.src = url
+  })
+}
+
+function drawCoverImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  ctx.save()
+  drawRoundRect(ctx, x, y, w, h, r)
+  ctx.clip()
+  const imgAspect = img.naturalWidth / img.naturalHeight
+  const boxAspect = w / h
+  let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight
+  if (imgAspect > boxAspect) {
+    sw = img.naturalHeight * boxAspect
+    sx = (img.naturalWidth - sw) / 2
+  } else {
+    sh = img.naturalWidth / boxAspect
+    sy = (img.naturalHeight - sh) / 2
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
+  ctx.restore()
+}
+
 async function loadSvgAsImage(svgEl: SVGSVGElement): Promise<HTMLImageElement> {
   const serializer = new XMLSerializer()
   const svgStr = serializer.serializeToString(svgEl)
@@ -71,28 +131,56 @@ async function generateTicketCanvas(
     eventName: string
     eventDate: string
     eventVenue: string
+    numberOfParticipants: number
+    bannerImageUrl?: string | null
   }
 ): Promise<HTMLCanvasElement> {
-  const qrImg = await loadSvgAsImage(svgEl)
+  const [qrImg, posterImg] = await Promise.all([
+    loadSvgAsImage(svgEl),
+    opts.bannerImageUrl ? loadImageFromUrl(opts.bannerImageUrl) : Promise.resolve(null),
+  ])
 
   const W = 600
-  const PAD = 44
+  const GREEN = "#014421"
+  const YELLOW = "#FEE715"
+  const QR_BOX_X = 99
+  const QR_BOX_W = 402
+  const QR_SIZE = 200
+  const QR_BOX_PAD = 22
+  const HEADER_H = 255
+  const BODY_Y = 225
+  const POSTER_H = 210
 
-  // Measure event name line count
+  // Measure event name lines (cap at 3)
   const probe = document.createElement("canvas").getContext("2d")!
-  const nameLines = wrapText(probe, opts.eventName, W - PAD * 2, "bold 26px sans-serif")
+  const nameLines = wrapText(
+    probe,
+    opts.eventName,
+    QR_BOX_W - 20,
+    "bold 22px Arial, sans-serif"
+  ).slice(0, 3)
 
-  // Layout
-  const HEADER_H = 110
-  const NAME_TOP = HEADER_H + 36
-  const NAME_H = nameLines.length * 36
-  const DATE_Y = NAME_TOP + NAME_H + 16
-  const TEAR_Y = DATE_Y + 50
-  const QR_SIZE = 220
-  const QR_BOX_PAD = 20
-  const QR_BOX_Y = TEAR_Y + 136
-  const FOOTER_Y = QR_BOX_Y + QR_SIZE + QR_BOX_PAD * 2 + 48
-  const H = FOOTER_Y + 52
+  // Info section starts below banner (if present) or just below header
+  const INFO_Y_START = posterImg
+    ? BODY_Y + 16 + POSTER_H + 16
+    : BODY_Y + 30
+
+  // Compute total info section height so QR box Y is fixed regardless of draw order
+  const INFO_H =
+    28 +                    // "EVENT TICKET" label
+    nameLines.length * 30 + // event name (per line)
+    10 +                    // gap after name
+    24 +                    // date
+    22 +                    // venue
+    20 +                    // divider
+    20 +                    // participant label
+    30 +                    // participant name
+    24 +                    // admits
+    22                      // ticket code
+  const QR_BOX_Y = INFO_Y_START + INFO_H + 16
+  const QR_BOX_H = QR_SIZE + QR_BOX_PAD * 2 + 30
+  const FOOTER_Y = QR_BOX_Y + QR_BOX_H + 28
+  const H = FOOTER_Y + 82
 
   const canvas = document.createElement("canvas")
   canvas.width = W
@@ -101,100 +189,118 @@ async function generateTicketCanvas(
   ctx.textBaseline = "alphabetic"
   ctx.textAlign = "center"
 
-  // ── Background ────────────────────────────────────────────
-  ctx.fillStyle = "#FEE715"
-  ctx.fillRect(0, 0, W, H)
-
-  // ── Header ────────────────────────────────────────────────
-  ctx.fillStyle = "#014421"
+  // ── Green Header ──────────────────────────────────────────────
+  ctx.fillStyle = GREEN
   ctx.fillRect(0, 0, W, HEADER_H)
 
-  // Yellow accent stripe at bottom of header
-  ctx.fillStyle = "#FEE715"
-  ctx.fillRect(0, HEADER_H - 3, W, 3)
+  // ── Yellow Body (rounded top corners) ─────────────────────────
+  ctx.fillStyle = YELLOW
+  drawRoundRect(ctx, 0, BODY_Y, W, H - BODY_Y, 28)
+  ctx.fill()
 
-  ctx.fillStyle = "#FEE715"
-  ctx.font = "bold 13px sans-serif"
-  ctx.fillText("ULSAHAM ENTERTAINMENTS", W / 2, 46)
-
-  ctx.fillStyle = "rgba(255,255,255,0.65)"
-  ctx.font = "11px sans-serif"
-  ctx.fillText("E V E N T   T I C K E T", W / 2, 70)
-
-  // ── Event info ────────────────────────────────────────────
-  ctx.fillStyle = "#0f2e1a"
-  ctx.font = "bold 26px sans-serif"
-  let ny = NAME_TOP
-  for (const line of nameLines) {
-    ctx.fillText(line, W / 2, ny)
-    ny += 36
+  // ── Poster / event banner ─────────────────────────────────────
+  if (posterImg) {
+    drawCoverImage(ctx, posterImg, QR_BOX_X, BODY_Y + 16, QR_BOX_W, POSTER_H, 12)
   }
 
-  ctx.fillStyle = "#666"
-  ctx.font = "14px sans-serif"
-  ctx.fillText(`${opts.eventDate}  ·  ${opts.eventVenue}`, W / 2, DATE_Y)
+  // ── ULSAHAM ───────────────────────────────────────────────────
+  ctx.fillStyle = YELLOW
+  ctx.font = "bold 76px 'Courier New', Courier, monospace"
+  ctx.fillText("ULSAHAM", W / 2, 132)
 
-  // ── Tear line ─────────────────────────────────────────────
-  ctx.setLineDash([6, 5])
-  ctx.strokeStyle = "#000"
-  ctx.lineWidth = 1.5
+  // ── ENTERTAINMENTS badge ──────────────────────────────────────
+  const BW = 378, BH = 48, BX = (W - BW) / 2, BY = 160
+  ctx.fillStyle = YELLOW
+  drawRoundRect(ctx, BX, BY, BW, BH, 24)
+  ctx.fill()
+  ctx.fillStyle = GREEN
+  ctx.font = "bold 18px Arial, Helvetica, sans-serif"
+  ctx.fillText("ENTERTAINMENTS", W / 2, BY + 32)
+
+  // ── Event info (yellow area) ───────────────────────────────────
+  let y = INFO_Y_START
+
+  ctx.fillStyle = "#2d6e3a"
+  ctx.font = "bold 10px Arial, sans-serif"
+  ctx.fillText("E V E N T   T I C K E T", W / 2, y)
+  y += 28
+
+  ctx.fillStyle = "#000"
+  ctx.font = "bold 22px Arial, sans-serif"
+  for (const line of nameLines) {
+    ctx.fillText(line, W / 2, y)
+    y += 30
+  }
+  y += 10
+
+  ctx.fillStyle = "#222"
+  ctx.font = "13px Arial, sans-serif"
+  ctx.fillText(opts.eventDate, W / 2, y)
+  y += 24
+
+  ctx.fillStyle = "#333"
+  ctx.font = "12px Arial, sans-serif"
+  ctx.fillText(opts.eventVenue, W / 2, y)
+  y += 22
+
+  ctx.strokeStyle = "#00000025"
+  ctx.lineWidth = 1
   ctx.beginPath()
-  ctx.moveTo(PAD, TEAR_Y)
-  ctx.lineTo(W - PAD, TEAR_Y)
+  ctx.moveTo(QR_BOX_X + 10, y)
+  ctx.lineTo(QR_BOX_X + QR_BOX_W - 10, y)
   ctx.stroke()
-  ctx.setLineDash([])
+  y += 20
 
-  // ── Participant stub ──────────────────────────────────────
-  ctx.fillStyle = "#014421"
-  ctx.font = "bold 10px sans-serif"
-  ctx.fillText("A D M I T   O N E", W / 2, TEAR_Y + 30)
+  ctx.fillStyle = GREEN
+  ctx.font = "bold 9px Arial, sans-serif"
+  ctx.fillText("REGISTERED PARTICIPANT", W / 2, y)
+  y += 20
 
-  ctx.fillStyle = "#111"
-  ctx.font = "bold 20px sans-serif"
-  ctx.fillText(opts.participantName, W / 2, TEAR_Y + 62)
+  ctx.fillStyle = "#000"
+  ctx.font = "bold 19px Arial, sans-serif"
+  ctx.fillText(opts.participantName, W / 2, y)
+  y += 30
 
-  ctx.fillStyle = "#888"
-  ctx.font = "13px monospace"
-  ctx.fillText(opts.ticketCode, W / 2, TEAR_Y + 88)
-
-  // ── QR card ───────────────────────────────────────────────
-  ctx.fillStyle = "#FEE715"
-  ctx.strokeStyle = "#000"
-  ctx.lineWidth = 1
-  ctx.fillRect(PAD, QR_BOX_Y, W - PAD * 2, QR_SIZE + QR_BOX_PAD * 2)
-  ctx.strokeRect(PAD, QR_BOX_Y, W - PAD * 2, QR_SIZE + QR_BOX_PAD * 2)
-
-  const qrX = (W - QR_SIZE) / 2
-  const qrY = QR_BOX_Y + QR_BOX_PAD
-  ctx.fillStyle = "#fff"
-  ctx.fillRect(qrX, qrY, QR_SIZE, QR_SIZE)
-  ctx.drawImage(qrImg, qrX, qrY, QR_SIZE, QR_SIZE)
-
-  // ── Scan instruction ──────────────────────────────────────
-  ctx.fillStyle = "#999"
-  ctx.font = "12px sans-serif"
+  ctx.fillStyle = "#333"
+  ctx.font = "12px Arial, sans-serif"
   ctx.fillText(
-    "Scan this code at the entrance",
+    `${opts.numberOfParticipants} ADMIT${opts.numberOfParticipants !== 1 ? "S" : ""}`,
     W / 2,
-    QR_BOX_Y + QR_SIZE + QR_BOX_PAD * 2 + 22
+    y
   )
+  y += 24
 
-  // ── Footer ────────────────────────────────────────────────
-  ctx.strokeStyle = "#000"
+  ctx.fillStyle = "#666"
+  ctx.font = "10px 'Courier New', Courier, monospace"
+  ctx.fillText(opts.ticketCode, W / 2, y)
+
+  // ── White QR box ──────────────────────────────────────────────
+  ctx.fillStyle = "#fff"
+  drawRoundRect(ctx, QR_BOX_X, QR_BOX_Y, QR_BOX_W, QR_BOX_H, 18)
+  ctx.fill()
+
+  const QR_X = (W - QR_SIZE) / 2
+  const QR_Y_POS = QR_BOX_Y + QR_BOX_PAD
+  ctx.fillStyle = "#fff"
+  ctx.fillRect(QR_X, QR_Y_POS, QR_SIZE, QR_SIZE)
+  ctx.drawImage(qrImg, QR_X, QR_Y_POS, QR_SIZE, QR_SIZE)
+
+  ctx.fillStyle = "#666"
+  ctx.font = "11px Arial, sans-serif"
+  ctx.fillText("Scan this code at the entrance", W / 2, QR_Y_POS + QR_SIZE + 20)
+
+  // ── Footer ────────────────────────────────────────────────────
+  ctx.strokeStyle = "#00000015"
   ctx.lineWidth = 1
   ctx.beginPath()
-  ctx.moveTo(PAD, FOOTER_Y)
-  ctx.lineTo(W - PAD, FOOTER_Y)
+  ctx.moveTo(QR_BOX_X, FOOTER_Y)
+  ctx.lineTo(QR_BOX_X + QR_BOX_W, FOOTER_Y)
   ctx.stroke()
 
   ctx.fillStyle = "#000"
-  ctx.font = "11px sans-serif"
-  ctx.fillText("Ulsaham Entertainments  ·  Thrissur, Kerala", W / 2, FOOTER_Y + 22)
-
-  // Outer border
-  ctx.strokeStyle = "#000"
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, W - 1, H - 1)
+  ctx.font = "bold 13px Arial, sans-serif"
+  ctx.fillText("Phone: 9446266011", W / 2, FOOTER_Y + 24)
+  ctx.fillText("Instagram: @ulsaham_", W / 2, FOOTER_Y + 50)
 
   return canvas
 }
@@ -206,6 +312,8 @@ export function QRCodeModal({
   eventName,
   eventDate,
   eventVenue,
+  numberOfParticipants,
+  bannerImageUrl,
 }: QRCodeModalProps) {
   const [open, setOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -225,6 +333,8 @@ export function QRCodeModal({
         eventName,
         eventDate,
         eventVenue,
+        numberOfParticipants,
+        bannerImageUrl,
       })
       canvas.toBlob((blob) => {
         if (!blob) return
@@ -256,13 +366,13 @@ export function QRCodeModal({
           <DialogTitle>Ticket QR Code</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
-          <div ref={qrRef} className="bg-white p-4 rounded-lg border border-gray-200">
+          <div ref={qrRef} className="bg-white p-4 rounded-lg border border-border">
             <QRCode value={ticketCode} size={180} />
           </div>
           <div className="text-center">
-            <p className="font-semibold text-gray-900">{participantName}</p>
-            <p className="text-xs text-gray-500 font-mono mt-1">{ticketCode}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{eventName}</p>
+            <p className="font-semibold">{participantName}</p>
+            <p className="text-xs font-mono mt-1">{ticketCode}</p>
+            <p className="text-xs mt-0.5 text-muted-foreground">{eventName}</p>
           </div>
           <Button onClick={handleDownload} disabled={downloading} className="w-full">
             <Download className="h-4 w-4 mr-2" />

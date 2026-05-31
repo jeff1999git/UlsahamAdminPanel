@@ -40,9 +40,10 @@ interface ParticipantTableProps {
   eventName: string
   eventDate: string
   eventVenue: string
+  eventBannerUrl?: string | null
 }
 
-export function ParticipantTable({ participants, eventId, totalCount, eventName, eventDate, eventVenue }: ParticipantTableProps) {
+export function ParticipantTable({ participants, eventId, totalCount, eventName, eventDate, eventVenue, eventBannerUrl }: ParticipantTableProps) {
   const [, startTransition] = useTransition()
   const [editParticipant, setEditParticipant] = useState<Participant | null>(null)
   const [editOpen, setEditOpen] = useState(false)
@@ -176,6 +177,8 @@ export function ParticipantTable({ participants, eventId, totalCount, eventName,
                         eventName={eventName}
                         eventDate={eventDate}
                         eventVenue={eventVenue}
+                        numberOfParticipants={p.numberOfParticipants}
+                        bannerImageUrl={eventBannerUrl}
                       />
 
                       <Button

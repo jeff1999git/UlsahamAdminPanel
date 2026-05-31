@@ -62,6 +62,7 @@ export default async function ParticipantsPage({ params }: Props) {
         eventName={event.name}
         eventDate={formatDate(event.date)}
         eventVenue={event.venue}
+        eventBannerUrl={event.bannerImageUrl}
       />
     </div>
   )
