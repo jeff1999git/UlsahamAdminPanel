@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDateTime } from "@/lib/utils"
 import { LOG_ACTION_LABELS } from "@/constants"
@@ -29,9 +29,6 @@ const actionVariantMap: Record<string, "default" | "secondary" | "destructive" |
 export function ActivityFeed({ logs }: ActivityFeedProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-semibold text-black">Recent Activity</CardTitle>
-      </CardHeader>
       <CardContent className="p-0">
         {logs.length === 0 ? (
           <div className="px-6 py-8 text-center text-sm text-black">

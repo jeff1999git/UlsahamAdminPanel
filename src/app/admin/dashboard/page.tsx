@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Dashboard" }
 async function DashboardContent() {
   const [stats, recentLogs] = await Promise.all([
     getDashboardStats(),
-    getRecentActivityLogs(10),
+    getRecentActivityLogs(20, 15),
   ])
 
   return (
@@ -82,7 +82,8 @@ async function DashboardContent() {
       </div>
 
       {/* Activity Feed */}
-      <div className="max-w-2xl">
+      <div className="max-w-2xl space-y-3">
+        <h2 className="text-lg font-semibold text-black">Recent Activity</h2>
         <ActivityFeed logs={recentLogs} />
       </div>
     </div>

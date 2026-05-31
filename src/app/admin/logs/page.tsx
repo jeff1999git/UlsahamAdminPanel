@@ -9,19 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Pagination } from "@/components/shared/data-table"
 import { TableSkeleton } from "@/components/shared/skeleton-loaders"
-import { listActivityLogs } from "@/repositories/activity-log.repository"
-import { formatDateTime } from "@/lib/utils"
+import { listActivityLogs, pruneOldActivityLogs } from "@/repositories/activity-log.repository"
+import { LogsFeed } from "@/components/admin/logs-feed"
 import { LOG_ACTION_LABELS } from "@/constants"
 import type { LogAction } from "@prisma/client"
 import type { Metadata } from "next"
@@ -34,25 +25,10 @@ interface SearchParams {
   action?: string
 }
 
-const actionVariantMap: Record<string, "success" | "destructive" | "info" | "warning" | "muted"> = {
-  LOGIN: "success",
-  LOGOUT: "muted",
-  EVENT_CREATED: "info",
-  EVENT_UPDATED: "info",
-  EVENT_DELETED: "destructive",
-  EVENT_STATUS_CHANGED: "warning",
-  PARTICIPANT_ADDED: "success",
-  PARTICIPANT_UPDATED: "info",
-  PARTICIPANT_DELETED: "destructive",
-  ATTENDANCE_MARKED: "success",
-  ATTENDANCE_UNMARKED: "warning",
-  SETTINGS_UPDATED: "info",
-  ADMIN_CREATED: "info",
-  ADMIN_UPDATED: "info",
-  ADMIN_DELETED: "destructive",
-}
-
 async function LogsContent({ params }: { params: SearchParams }) {
+  // Fire-and-forget: hard-delete logs older than 30 days
+  pruneOldActivityLogs().catch(() => {})
+
   const page = parseInt(params.page ?? "1")
   const search = params.search ?? ""
   const actionParam = params.action ?? ""
@@ -69,62 +45,21 @@ async function LogsContent({ params }: { params: SearchParams }) {
   if (search) currentParams.search = search
   if (action) currentParams.action = actionParam
 
+  const serialized = logs.map((log) => ({
+    id: log.id,
+    adminUsername: log.adminUsername,
+    adminRole: log.adminRole,
+    action: log.action,
+    entity: log.entity,
+    entityId: log.entityId,
+    description: log.description,
+    ipAddress: log.ipAddress,
+    createdAt: log.createdAt.toISOString(),
+  }))
+
   return (
     <div className="space-y-4">
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-card">
-              <TableHead>Timestamp</TableHead>
-              <TableHead>Admin</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>IP Address</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-black">
-                  No activity logs found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="text-xs text-black whitespace-nowrap">
-                    <time dateTime={log.createdAt.toISOString()}>
-                      {formatDateTime(log.createdAt)}
-                    </time>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm font-medium text-black">{log.adminUsername}</p>
-                      <p className="text-xs text-black">
-                        {log.adminRole === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={actionVariantMap[log.action] ?? "muted"}
-                      className="text-xs whitespace-nowrap"
-                    >
-                      {LOG_ACTION_LABELS[log.action] ?? log.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-black max-w-[300px] truncate">
-                    {log.description}
-                  </TableCell>
-                  <TableCell className="text-xs text-black font-mono whitespace-nowrap">
-                    {log.ipAddress}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <LogsFeed logs={serialized} />
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-black">{total} log entries</p>
@@ -150,7 +85,7 @@ export default async function LogsPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-black">Activity Logs</h1>
-        <p className="text-sm text-black mt-1">Read-only audit trail of all admin actions</p>
+        <p className="text-sm text-black mt-1">Read-only audit trail of all admin actions (last 30 days)</p>
       </div>
 
       <form method="GET" className="flex gap-3 flex-wrap">
@@ -181,7 +116,7 @@ export default async function LogsPage({
         </Button>
       </form>
 
-      <Suspense fallback={<TableSkeleton rows={10} cols={5} />}>
+      <Suspense fallback={<TableSkeleton rows={10} cols={1} />}>
         <LogsContent params={params} />
       </Suspense>
     </div>
