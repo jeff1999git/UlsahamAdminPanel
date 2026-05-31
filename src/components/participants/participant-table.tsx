@@ -234,22 +234,26 @@ export function ParticipantTable({
                         onClick={(e) => e.stopPropagation()}
                       >
                         {attendanceMode ? (
-                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 cursor-pointer">
-                            <Checkbox
-                              checked={p.attended}
-                              onCheckedChange={() => handleToggleAttendance(p.id, p.attended)}
-                              aria-label={p.attended ? "Unmark attendance" : "Mark attendance"}
-                              className="h-4 w-4"
-                            />
-                            <span className="text-xs font-semibold text-blue-700 leading-none">Present</span>
-                          </label>
+                          (p.amountPaid) ? (
+                            <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#014421] border border-[#014421] cursor-pointer">
+                              <Checkbox
+                                checked={p.attended}
+                                onCheckedChange={() => handleToggleAttendance(p.id, p.attended)}
+                                aria-label={p.attended ? "Unmark attendance" : "Mark attendance"}
+                                className="h-4 w-4 bg-white border-white data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-[#014421]"
+                              />
+                              <span className="text-xs font-semibold text-white leading-none">Present</span>
+                            </label>
+                          ) : (
+                            <span className="text-[9px] text-black/40 font-medium px-2">Unpaid</span>
+                          )
                         ) : (
-                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-600 border border-emerald-600 cursor-pointer">
+                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#014421] border border-[#014421] cursor-pointer">
                             <Checkbox
                               checked={p.amountPaid ?? false}
                               onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
                               aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
-                              className="h-4 w-4 border-white data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-emerald-600"
+                              className="h-4 w-4 bg-white border-white data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-[#014421]"
                             />
                             <span className="text-xs font-semibold text-white leading-none">Paid</span>
                           </label>
