@@ -28,6 +28,7 @@ interface QRCodeModalProps {
   eventVenue: string
   numberOfParticipants: number
   bannerImageUrl?: string | null
+  fullWidth?: boolean
 }
 
 function wrapText(
@@ -302,6 +303,7 @@ export function QRCodeModal({
   eventVenue,
   numberOfParticipants,
   bannerImageUrl,
+  fullWidth = false,
 }: QRCodeModalProps) {
   const [open, setOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -345,9 +347,16 @@ export function QRCodeModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="View QR code">
-          <QrCode className="h-4 w-4" />
-        </Button>
+        {fullWidth ? (
+          <Button variant="outline" size="sm" className="w-full" aria-label="View QR code">
+            <QrCode className="h-3.5 w-3.5 mr-1.5" />
+            View QR & Download Ticket
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="View QR code">
+            <QrCode className="h-4 w-4" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
