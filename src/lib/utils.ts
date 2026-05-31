@@ -7,14 +7,16 @@ export function cn(...inputs: ClassValue[]) {
 
 const IST_TIMEZONE = "Asia/Kolkata"
 
-const dateFormatter = new Intl.DateTimeFormat("en-IN", {
+// en-IN uses locale-dependent separators (hyphens in Node, spaces in browsers).
+// Use formatToParts with a neutral locale to build consistent strings manually.
+const partsFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: IST_TIMEZONE,
   day: "2-digit",
   month: "short",
   year: "numeric",
 })
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
+const partsTimeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: IST_TIMEZONE,
   day: "2-digit",
   month: "short",
@@ -26,12 +28,18 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
 
 export function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date
-  return dateFormatter.format(d)
+  const parts = Object.fromEntries(
+    partsFormatter.formatToParts(d).map((p) => [p.type, p.value])
+  )
+  return `${parts.day} ${parts.month} ${parts.year}`
 }
 
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date
-  return dateTimeFormatter.format(d)
+  const parts = Object.fromEntries(
+    partsTimeFormatter.formatToParts(d).map((p) => [p.type, p.value])
+  )
+  return `${parts.day} ${parts.month} ${parts.year}, ${parts.hour}:${parts.minute} ${parts.dayPeriod}`
 }
 
 export function formatCurrency(amount: number): string {

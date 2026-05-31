@@ -17,11 +17,10 @@ import {
 } from "@/components/ui/form"
 import { participantSchema, type ParticipantFormValues } from "@/validators/participant.validator"
 import { addParticipantAction, updateParticipantAction } from "@/actions/participant.actions"
-import type { Participant } from "@prisma/client"
 
 interface ParticipantFormProps {
   eventId: string
-  participant?: Participant
+  participant?: ParticipantFormValues & { id: string }
   onSuccess?: () => void
 }
 
