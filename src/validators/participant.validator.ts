@@ -23,7 +23,7 @@ export const participantSchema = z.object({
     .number()
     .int("Number of participants must be a whole number")
     .min(1, "At least 1 participant required")
-    .max(20, "Maximum 20 participants per registration"),
+    .max(10, "Maximum 10 participants per registration"),
 })
 
 export const publicRegistrationSchema = participantSchema.extend({

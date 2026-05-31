@@ -150,7 +150,7 @@ export function ParticipantForm({ eventId, participant, onSuccess }: Participant
                     type="number"
                     placeholder="1"
                     min={1}
-                    max={20}
+                    max={10}
                     {...field}
                     value={field.value ?? ""}
                   />
