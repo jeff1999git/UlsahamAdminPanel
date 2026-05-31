@@ -13,6 +13,7 @@ export interface NavItem {
   icon: LucideIcon
   badge?: string
   superAdminOnly?: boolean
+  headerOnly?: boolean
 }
 
 export const adminNavItems: NavItem[] = [
@@ -31,11 +32,13 @@ export const adminNavItems: NavItem[] = [
     href: "/admin/admins",
     icon: UserCog,
     superAdminOnly: true,
+    headerOnly: true,
   },
   {
     label: "Settings",
     href: "/admin/settings",
     icon: Settings,
+    headerOnly: true,
   },
   {
     label: "Activity Logs",
