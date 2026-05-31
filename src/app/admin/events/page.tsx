@@ -113,7 +113,7 @@ export default async function EventsPage({
         </Button>
       </form>
 
-      <Suspense fallback={<TableSkeleton rows={5} cols={6} />}>
+      <Suspense fallback={<TableSkeleton rows={5} cols={1} />}>
         <EventsList searchParams={params} />
       </Suspense>
     </div>
