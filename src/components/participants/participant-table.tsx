@@ -244,14 +244,14 @@ export function ParticipantTable({
                             <span className="text-xs font-semibold text-blue-700 leading-none">Present</span>
                           </label>
                         ) : (
-                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 cursor-pointer">
+                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-600 border border-emerald-600 cursor-pointer">
                             <Checkbox
                               checked={p.amountPaid ?? false}
                               onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
                               aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
-                              className="h-4 w-4 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                              className="h-4 w-4 border-white data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-emerald-600"
                             />
-                            <span className="text-xs font-semibold text-emerald-700 leading-none">Paid</span>
+                            <span className="text-xs font-semibold text-white leading-none">Paid</span>
                           </label>
                         )}
                       </div>
