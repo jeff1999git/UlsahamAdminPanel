@@ -1,0 +1,420 @@
+"use client"
+
+import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ImageUpload } from "@/components/shared/image-upload"
+import { createEventSchema, type CreateEventFormValues } from "@/validators/event.validator"
+import { createEventAction, updateEventAction } from "@/actions/event.actions"
+import { generateSlug } from "@/lib/slug"
+import type { Event } from "@prisma/client"
+
+interface EventFormProps {
+  event?: Event
+}
+
+function formatTimeForInput(time: string): string {
+  if (!time) return ""
+  const match = time.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i)
+  if (!match) return ""
+  let [, hours, minutes, meridiem] = match
+  let h = parseInt(hours)
+  if (meridiem.toUpperCase() === "PM" && h < 12) h += 12
+  if (meridiem.toUpperCase() === "AM" && h === 12) h = 0
+  return `${String(h).padStart(2, "0")}:${minutes}`
+}
+
+function formatTimeFromInput(time: string): string {
+  if (!time) return ""
+  const [h, m] = time.split(":").map(Number)
+  const meridiem = h >= 12 ? "PM" : "AM"
+  const hours = h % 12 || 12
+  return `${hours}:${String(m).padStart(2, "0")} ${meridiem}`
+}
+
+export function EventForm({ event }: EventFormProps) {
+  const router = useRouter()
+  const isEditing = !!event
+
+  const form = useForm<CreateEventFormValues>({
+    resolver: zodResolver(createEventSchema),
+    defaultValues: {
+      name: event?.name ?? "",
+      slug: event?.slug ?? "",
+      description: event?.description ?? "",
+      bannerImageUrl: event?.bannerImageUrl ?? "",
+      bannerImageId: event?.bannerImageId ?? "",
+      venue: event?.venue ?? "",
+      date: event?.date ? new Date(event.date) : new Date(),
+      startTime: event?.startTime ?? "10:00 AM",
+      endTime: event?.endTime ?? "05:00 PM",
+      isFree: event?.isFree ?? true,
+      amount: event?.amount ?? undefined,
+      status: event?.status ?? "DRAFT",
+      capacity: event?.capacity ?? undefined,
+      featured: event?.featured ?? false,
+    },
+  })
+
+  const isFree = form.watch("isFree")
+  const isSubmitting = form.formState.isSubmitting
+
+  async function onSubmit(values: CreateEventFormValues) {
+    const result = isEditing
+      ? await updateEventAction({ ...values, id: event.id })
+      : await createEventAction(values)
+
+    if (!result.success) {
+      toast.error(result.error)
+      return
+    }
+
+    toast.success(isEditing ? "Event updated successfully" : "Event created successfully")
+    router.push("/admin/events")
+    router.refresh()
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main fields */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Event Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Name *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Ulsaham Fest 2025"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e)
+                            if (!isEditing) {
+                              form.setValue("slug", generateSlug(e.target.value))
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Slug *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ulsaham-fest-2025" {...field} />
+                      </FormControl>
+                      <FormDescription>URL-friendly identifier for the event</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description *</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe the event..."
+                          className="min-h-[120px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="venue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Venue *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Town Hall, Thrissur" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={
+                              field.value
+                                ? new Date(field.value).toISOString().split("T")[0]
+                                : ""
+                            }
+                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="startTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Start Time *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            value={formatTimeForInput(field.value)}
+                            onChange={(e) =>
+                              field.onChange(formatTimeFromInput(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="endTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>End Time *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            value={formatTimeForInput(field.value)}
+                            onChange={(e) =>
+                              field.onChange(formatTimeFromInput(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pricing */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Pricing & Capacity</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="isFree"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div>
+                        <FormLabel>Free Event</FormLabel>
+                        <FormDescription>Toggle off to set a ticket price</FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {!isFree && (
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount (₹) *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            min="0"
+                            step="0.01"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Capacity</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Leave blank for unlimited"
+                          min="1"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(e.target.value ? parseInt(e.target.value) : null)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>Maximum number of participants</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar fields */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Banner Image *</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="bannerImageUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <ImageUpload
+                          value={field.value}
+                          onChange={(url, publicId) => {
+                            form.setValue("bannerImageUrl", url)
+                            form.setValue("bannerImageId", publicId)
+                          }}
+                          onClear={() => {
+                            form.setValue("bannerImageUrl", "")
+                            form.setValue("bannerImageId", "")
+                          }}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Publishing</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status *</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="DRAFT">Draft</SelectItem>
+                          <SelectItem value="PUBLISHED">Published</SelectItem>
+                          <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                          <SelectItem value="COMPLETED">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="featured"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div>
+                        <FormLabel className="cursor-pointer">Featured Event</FormLabel>
+                        <FormDescription>Show in featured events list</FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.back()}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {isEditing ? "Update Event" : "Create Event"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </Form>
+  )
+}

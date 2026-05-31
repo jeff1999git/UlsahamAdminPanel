@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand: #014421 → hsl(149, 97%, 13%) */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+
+    /* Primary: #014421 (dark green) */
+    --primary: 149 97% 13%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: #FEE715 (yellow) */
+    --secondary: 54 99% 54%;
+    --secondary-foreground: 0 0% 0%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    /* Accent: same as secondary for highlights */
+    --accent: 54 99% 54%;
+    --accent-foreground: 0 0% 0%;
+
+    /* Danger: #DC2626 */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 149 97% 13%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .sidebar-item-active {
+    color: #FEE715;
+    background-color: rgba(254, 231, 21, 0.15);
+  }
+  .sidebar-item-hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

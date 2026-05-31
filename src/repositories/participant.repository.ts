@@ -1,0 +1,116 @@
+import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@prisma/client"
+import type { ParticipantListParams } from "@/types/participant.types"
+import { DEFAULT_PAGE_SIZE } from "@/constants"
+
+export async function findParticipantById(id: string) {
+  return prisma.participant.findUnique({
+    where: { id },
+    include: { event: true },
+  })
+}
+
+export async function findParticipantByTicketCode(ticketCode: string) {
+  return prisma.participant.findUnique({
+    where: { ticketCode },
+    include: {
+      event: {
+        select: { id: true, name: true, slug: true, date: true, venue: true },
+      },
+    },
+  })
+}
+
+export async function findParticipantByEventAndPhone(eventId: string, phone: string) {
+  return prisma.participant.findUnique({
+    where: { eventId_phone: { eventId, phone } },
+  })
+}
+
+export async function listParticipants(params: ParticipantListParams) {
+  const {
+    eventId,
+    page = 1,
+    limit = DEFAULT_PAGE_SIZE,
+    search,
+    attended,
+    sortBy = "registeredAt",
+    sortOrder = "desc",
+  } = params
+
+  const where: Prisma.ParticipantWhereInput = { eventId }
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search } },
+      { ticketCode: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+    ]
+  }
+
+  if (attended !== undefined && attended !== "") {
+    where.attended = attended as boolean
+  }
+
+  const [participants, total] = await Promise.all([
+    prisma.participant.findMany({
+      where,
+      orderBy: { [sortBy]: sortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.participant.count({ where }),
+  ])
+
+  return {
+    participants,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+  }
+}
+
+export async function getAllParticipantsForEvent(eventId: string) {
+  return prisma.participant.findMany({
+    where: { eventId },
+    orderBy: { registeredAt: "asc" },
+  })
+}
+
+export async function createParticipant(data: Prisma.ParticipantCreateInput) {
+  return prisma.participant.create({ data })
+}
+
+export async function updateParticipant(id: string, data: Prisma.ParticipantUpdateInput) {
+  return prisma.participant.update({ where: { id }, data })
+}
+
+export async function deleteParticipant(id: string) {
+  return prisma.participant.delete({ where: { id } })
+}
+
+export async function countParticipantsForEvent(eventId: string) {
+  const result = await prisma.participant.aggregate({
+    where: { eventId },
+    _sum: { numberOfParticipants: true },
+  })
+  return result._sum.numberOfParticipants ?? 0
+}
+
+export async function markAttendance(ticketCode: string, eventId: string) {
+  const participant = await prisma.participant.findUnique({
+    where: { ticketCode },
+  })
+
+  if (!participant) return { found: false, alreadyAttended: false, participant: null }
+  if (participant.eventId !== eventId) return { found: false, alreadyAttended: false, participant: null }
+  if (participant.attended) return { found: true, alreadyAttended: true, participant }
+
+  const updated = await prisma.participant.update({
+    where: { id: participant.id },
+    data: { attended: true, attendedAt: new Date() },
+  })
+
+  return { found: true, alreadyAttended: false, participant: updated }
+}
