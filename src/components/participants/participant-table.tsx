@@ -16,7 +16,7 @@ import {
   Hash,
   Users,
 } from "lucide-react"
-import Papa from "papaparse"
+import * as XLSX from "xlsx"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -95,34 +95,27 @@ export function ParticipantTable({
     })
   }
 
-  async function handleExportCSV() {
+  async function handleExportXLSX() {
     try {
       const all = await exportParticipantsAction(eventId)
-      const csv = Papa.unparse(
-        all.map((p) => ({
-          "Ticket Code": p.ticketCode,
-          "Name": p.name,
-          "Phone": p.phone,
-          "Email": p.email ?? "",
-          "Age": p.age,
-          "No. of Participants": p.numberOfParticipants,
-          "Attended": p.attended ? "Yes" : "No",
-          "Attended At": p.attendedAt ? formatDateTime(p.attendedAt) : "",
-          "Registered At": formatDateTime(p.registeredAt),
-        }))
-      )
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `participants-${eventId}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      toast.success("CSV exported successfully")
+      const rows = all.map((p) => ({
+        "Ticket Code": p.ticketCode,
+        "Name": p.name,
+        "Phone": p.phone,
+        "Email": p.email ?? "",
+        "Age": p.age,
+        "No. of Participants": p.numberOfParticipants,
+        "Attended": p.attended ? "Yes" : "No",
+        "Attended At": p.attendedAt ? formatDateTime(p.attendedAt) : "",
+        "Registered At": formatDateTime(p.registeredAt),
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Participants")
+      XLSX.writeFile(wb, `participants-${eventId}.xlsx`)
+      toast.success("Excel file exported successfully")
     } catch {
-      toast.error("Failed to export CSV")
+      toast.error("Failed to export Excel file")
     }
   }
 
@@ -133,9 +126,9 @@ export function ParticipantTable({
         <p className="text-sm text-black font-medium">
           {totalCount} participant{totalCount !== 1 ? "s" : ""} registered
         </p>
-        <Button variant="outline" size="sm" onClick={handleExportCSV}>
+        <Button variant="outline" size="sm" onClick={handleExportXLSX}>
           <Download className="h-4 w-4 mr-2" />
-          Export CSV
+          Export Excel
         </Button>
       </div>
 
