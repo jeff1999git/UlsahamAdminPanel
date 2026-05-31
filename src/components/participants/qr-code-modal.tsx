@@ -102,7 +102,7 @@ async function generateTicketCanvas(
   ctx.textAlign = "center"
 
   // ── Background ────────────────────────────────────────────
-  ctx.fillStyle = "#ffffff"
+  ctx.fillStyle = "#FEE715"
   ctx.fillRect(0, 0, W, H)
 
   // ── Header ────────────────────────────────────────────────
@@ -136,7 +136,7 @@ async function generateTicketCanvas(
 
   // ── Tear line ─────────────────────────────────────────────
   ctx.setLineDash([6, 5])
-  ctx.strokeStyle = "#ccc"
+  ctx.strokeStyle = "#000"
   ctx.lineWidth = 1.5
   ctx.beginPath()
   ctx.moveTo(PAD, TEAR_Y)
@@ -158,8 +158,8 @@ async function generateTicketCanvas(
   ctx.fillText(opts.ticketCode, W / 2, TEAR_Y + 88)
 
   // ── QR card ───────────────────────────────────────────────
-  ctx.fillStyle = "#fafafa"
-  ctx.strokeStyle = "#e8e8e8"
+  ctx.fillStyle = "#FEE715"
+  ctx.strokeStyle = "#000"
   ctx.lineWidth = 1
   ctx.fillRect(PAD, QR_BOX_Y, W - PAD * 2, QR_SIZE + QR_BOX_PAD * 2)
   ctx.strokeRect(PAD, QR_BOX_Y, W - PAD * 2, QR_SIZE + QR_BOX_PAD * 2)
@@ -180,19 +180,19 @@ async function generateTicketCanvas(
   )
 
   // ── Footer ────────────────────────────────────────────────
-  ctx.strokeStyle = "#ebebeb"
+  ctx.strokeStyle = "#000"
   ctx.lineWidth = 1
   ctx.beginPath()
   ctx.moveTo(PAD, FOOTER_Y)
   ctx.lineTo(W - PAD, FOOTER_Y)
   ctx.stroke()
 
-  ctx.fillStyle = "#bbb"
+  ctx.fillStyle = "#000"
   ctx.font = "11px sans-serif"
   ctx.fillText("Ulsaham Entertainments  ·  Thrissur, Kerala", W / 2, FOOTER_Y + 22)
 
   // Outer border
-  ctx.strokeStyle = "#e0e0e0"
+  ctx.strokeStyle = "#000"
   ctx.lineWidth = 1
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1)
 

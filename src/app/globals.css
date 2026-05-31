@@ -6,13 +6,13 @@
   :root {
     /* Brand: #014421 → hsl(149, 97%, 13%) */
     --background: 54 99% 54%;
-    --foreground: 0 0% 4%;
+    --foreground: 0 0% 0%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
+    --card: 54 99% 54%;
+    --card-foreground: 0 0% 0%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
+    --popover: 54 99% 54%;
+    --popover-foreground: 0 0% 0%;
 
     /* Primary: #014421 (dark green) */
     --primary: 149 97% 13%;
@@ -22,8 +22,8 @@
     --secondary: 54 99% 54%;
     --secondary-foreground: 0 0% 0%;
 
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 54 99% 45%;
+    --muted-foreground: 0 0% 15%;
 
     /* Accent: same as secondary for highlights */
     --accent: 54 99% 54%;
@@ -49,6 +49,16 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Override browser autofill white background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px hsl(54, 99%, 54%) inset !important;
+  -webkit-text-fill-color: #000000 !important;
+  caret-color: #000000;
 }
 
 @layer utilities {

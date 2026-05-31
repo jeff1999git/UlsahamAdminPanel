@@ -76,7 +76,7 @@ export function EventTable({ events }: EventTableProps) {
     <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50">
+          <TableRow className="bg-card">
             <TableHead>Event</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>

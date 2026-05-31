@@ -38,7 +38,7 @@ export function ActivityFeed({ logs }: ActivityFeedProps) {
             No activity yet.
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100" aria-label="Recent activity feed">
+          <ul className="divide-y divide-border" aria-label="Recent activity feed">
             {logs.map((log) => (
               <li key={log.id} className="px-6 py-3 flex items-start gap-3">
                 <div className="flex-1 min-w-0">

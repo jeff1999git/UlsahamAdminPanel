@@ -123,7 +123,7 @@ export function ParticipantTable({ participants, eventId, totalCount, eventName,
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
+              <TableRow className="bg-card">
                 <TableHead>Participant</TableHead>
                 <TableHead>Ticket Code</TableHead>
                 <TableHead>Phone</TableHead>

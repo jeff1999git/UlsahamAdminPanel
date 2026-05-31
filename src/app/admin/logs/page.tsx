@@ -74,7 +74,7 @@ async function LogsContent({ params }: { params: SearchParams }) {
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-gray-50">
+            <TableRow className="bg-card">
               <TableHead>Timestamp</TableHead>
               <TableHead>Admin</TableHead>
               <TableHead>Action</TableHead>
