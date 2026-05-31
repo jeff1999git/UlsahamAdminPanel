@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  username     String    @unique
+  passwordHash String
+  role         AdminRole
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+}
+
+model Event {
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  slug           String      @unique
+  description    String
+  bannerImageUrl String
+  bannerImageId  String
+  venue          String
+  date           DateTime
+  startTime      String
+  endTime        String
+  isFree         Boolean     @default(true)
+  amount         Float?
+  status         EventStatus @default(DRAFT)
+  capacity       Int?
+  featured       Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  participants   Participant[]
+
+  @@index([date])
+  @@index([status])
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+model Participant {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  eventId              String    @db.ObjectId
+  event                Event     @relation(fields: [eventId], references: [id])
+  name                 String
+  phone                String
+  email                String?
+  age                  Int
+  numberOfParticipants Int       @default(1)
+  ticketCode           String    @unique
+  qrCodeUrl            String
+  qrCodeImageId        String
+  attended             Boolean   @default(false)
+  attendedAt           DateTime?
+  registeredAt         DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([eventId, phone])
+  @@index([eventId])
+  @@index([phone])
+}
+
+model Settings {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  companyName String   @default("Ulsaham Entertainments")
+  address     String?
+  email       String?
+  phone       String?
+  facebook    String?
+  instagram   String?
+  youtube     String?
+  linkedin    String?
+  updatedAt   DateTime @updatedAt
+}
+
+model ActivityLog {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  adminUsername String
+  adminRole     String
+  action        LogAction
+  entity        String
+  entityId      String?
+  description   String
+  metadata      Json?
+  ipAddress     String
+  createdAt     DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([adminUsername])
+  @@index([action])
+}
+
+enum LogAction {
+  LOGIN
+  LOGOUT
+  EVENT_CREATED
+  EVENT_UPDATED
+  EVENT_DELETED
+  EVENT_STATUS_CHANGED
+  PARTICIPANT_ADDED
+  PARTICIPANT_UPDATED
+  PARTICIPANT_DELETED
+  ATTENDANCE_MARKED
+  ATTENDANCE_UNMARKED
+  SETTINGS_UPDATED
+  ADMIN_CREATED
+  ADMIN_UPDATED
+  ADMIN_DELETED
+}
