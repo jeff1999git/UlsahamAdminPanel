@@ -15,6 +15,7 @@ import {
   Calendar,
   Hash,
   Users,
+  MessageCircle,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Button } from "@/components/ui/button"
@@ -72,6 +73,7 @@ export function ParticipantTable({
 
   // Mobile-only detail modal state
   const [selectedMobile, setSelectedMobile] = useState<Participant | null>(null)
+  const [phoneContact, setPhoneContact] = useState<{ name: string; phone: string } | null>(null)
 
   function handleDelete(id: string) {
     startTransition(async () => {
@@ -162,7 +164,12 @@ export function ParticipantTable({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-black truncate">{p.name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-black/60">{p.phone}</span>
+                          <button
+                            className="text-xs text-[#014421] underline underline-offset-2 font-medium"
+                            onClick={(e) => { e.stopPropagation(); setPhoneContact({ name: p.name, phone: p.phone }) }}
+                          >
+                            {p.phone}
+                          </button>
                           <span className="text-xs text-black/40">·</span>
                           <span className="text-xs text-black/60">
                             {p.numberOfParticipants} person{p.numberOfParticipants !== 1 ? "s" : ""}
@@ -417,6 +424,38 @@ export function ParticipantTable({
                   />
                 </div>
               </div>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
+
+      {/* Phone contact modal */}
+      <Dialog open={!!phoneContact} onOpenChange={(open) => !open && setPhoneContact(null)}>
+        {phoneContact && (
+          <DialogContent className="max-w-xs mx-auto">
+            <DialogHeader>
+              <DialogTitle className="text-black text-base">{phoneContact.name}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-black/60 -mt-1">{phoneContact.phone}</p>
+            <div className="flex flex-col gap-2 pt-1">
+              <a
+                href={`https://wa.me/${phoneContact.phone.replace(/\D/g, "").replace(/^0/, "91")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2.5 w-full rounded-md border border-[#25D366] bg-[#25D366]/10 px-4 py-2.5 text-sm font-medium text-[#128C7E] hover:bg-[#25D366]/20 transition-colors"
+                onClick={() => setPhoneContact(null)}
+              >
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp Message
+              </a>
+              <a
+                href={`tel:${phoneContact.phone}`}
+                className="flex items-center justify-center gap-2.5 w-full rounded-md border border-black/20 px-4 py-2.5 text-sm font-medium text-black hover:bg-black/5 transition-colors"
+                onClick={() => setPhoneContact(null)}
+              >
+                <Phone className="h-4 w-4" />
+                Call
+              </a>
             </div>
           </DialogContent>
         )}
