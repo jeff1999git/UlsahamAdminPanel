@@ -106,7 +106,7 @@ export function ParticipantTable({ participants, eventId, totalCount, eventName,
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-black font-medium">
           {totalCount} participant{totalCount !== 1 ? "s" : ""} registered
         </p>
         <Button variant="outline" size="sm" onClick={handleExportCSV}>
@@ -139,19 +139,19 @@ export function ParticipantTable({ participants, eventId, totalCount, eventName,
                 <TableRow key={p.id}>
                   <TableCell>
                     <div>
-                      <p className="font-medium text-sm text-gray-900">{p.name}</p>
+                      <p className="font-medium text-sm text-black">{p.name}</p>
                       {p.email && (
-                        <p className="text-xs text-gray-400">{p.email}</p>
+                        <p className="text-xs text-black">{p.email}</p>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">
+                    <code className="text-xs bg-black/10 border border-black px-1.5 py-0.5 rounded font-mono text-black">
                       {p.ticketCode}
                     </code>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600">{p.phone}</TableCell>
-                  <TableCell className="text-sm text-center text-gray-600">
+                  <TableCell className="text-sm text-black">{p.phone}</TableCell>
+                  <TableCell className="text-sm text-center text-black">
                     {p.numberOfParticipants}
                   </TableCell>
                   <TableCell>
@@ -165,7 +165,7 @@ export function ParticipantTable({ participants, eventId, totalCount, eventName,
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-400 whitespace-nowrap">
+                  <TableCell className="text-xs text-black whitespace-nowrap">
                     {formatDate(p.registeredAt)}
                   </TableCell>
                   <TableCell>

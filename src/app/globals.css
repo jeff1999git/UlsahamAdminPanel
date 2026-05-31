@@ -23,7 +23,7 @@
     --secondary-foreground: 0 0% 0%;
 
     --muted: 54 99% 45%;
-    --muted-foreground: 0 0% 15%;
+    --muted-foreground: 0 0% 0%;
 
     /* Accent: same as secondary for highlights */
     --accent: 54 99% 54%;

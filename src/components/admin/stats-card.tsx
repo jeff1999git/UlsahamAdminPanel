@@ -28,10 +28,10 @@ export function StatsCard({
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+            <p className="text-sm font-medium text-black">{title}</p>
+            <p className="text-2xl font-bold text-black mt-1">{value}</p>
             {description && (
-              <p className="text-xs text-gray-400 mt-1">{description}</p>
+              <p className="text-xs text-black mt-1">{description}</p>
             )}
           </div>
           <div

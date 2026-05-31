@@ -48,7 +48,7 @@ async function EventsList({ searchParams }: { searchParams: SearchParams }) {
     <div className="space-y-4">
       <EventTable events={events} />
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-black">
           {total} event{total !== 1 ? "s" : ""} total
         </p>
         <Pagination
@@ -74,8 +74,8 @@ export default async function EventsPage({
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Events</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your events</p>
+          <h1 className="text-2xl font-bold text-black">Events</h1>
+          <p className="text-sm text-black mt-1">Manage your events</p>
         </div>
         <Button asChild>
           <Link href="/admin/events/new">
@@ -88,7 +88,7 @@ export default async function EventsPage({
       {/* Filters */}
       <form method="GET" className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black" />
           <Input
             name="search"
             placeholder="Search events..."

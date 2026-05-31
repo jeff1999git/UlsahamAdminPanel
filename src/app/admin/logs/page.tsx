@@ -85,22 +85,22 @@ async function LogsContent({ params }: { params: SearchParams }) {
           <TableBody>
             {logs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-10 text-black">
                   No activity logs found.
                 </TableCell>
               </TableRow>
             ) : (
               logs.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-xs text-gray-500 whitespace-nowrap">
+                  <TableCell className="text-xs text-black whitespace-nowrap">
                     <time dateTime={log.createdAt.toISOString()}>
                       {formatDateTime(log.createdAt)}
                     </time>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{log.adminUsername}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-sm font-medium text-black">{log.adminUsername}</p>
+                      <p className="text-xs text-black">
                         {log.adminRole === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
                       </p>
                     </div>
@@ -113,10 +113,10 @@ async function LogsContent({ params }: { params: SearchParams }) {
                       {LOG_ACTION_LABELS[log.action] ?? log.action}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600 max-w-[300px] truncate">
+                  <TableCell className="text-sm text-black max-w-[300px] truncate">
                     {log.description}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-400 font-mono whitespace-nowrap">
+                  <TableCell className="text-xs text-black font-mono whitespace-nowrap">
                     {log.ipAddress}
                   </TableCell>
                 </TableRow>
@@ -127,7 +127,7 @@ async function LogsContent({ params }: { params: SearchParams }) {
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{total} log entries</p>
+        <p className="text-sm text-black">{total} log entries</p>
         <Pagination
           page={page}
           totalPages={totalPages}
@@ -149,13 +149,13 @@ export default async function LogsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Activity Logs</h1>
-        <p className="text-sm text-gray-500 mt-1">Read-only audit trail of all admin actions</p>
+        <h1 className="text-2xl font-bold text-black">Activity Logs</h1>
+        <p className="text-sm text-black mt-1">Read-only audit trail of all admin actions</p>
       </div>
 
       <form method="GET" className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black" />
           <Input
             name="search"
             placeholder="Search by admin username..."

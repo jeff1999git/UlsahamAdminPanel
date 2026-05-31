@@ -123,7 +123,7 @@ export function ImageUpload({
           onClick={() => inputRef.current?.click()}
           disabled={disabled || uploading}
           className={cn(
-            "w-full aspect-video rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 text-gray-500 hover:border-[#014421] hover:text-[#014421] transition-colors cursor-pointer",
+            "w-full aspect-video rounded-lg border-2 border-dashed border-black flex flex-col items-center justify-center gap-2 text-black hover:border-[#014421] hover:text-[#014421] transition-colors cursor-pointer",
             (disabled || uploading) && "opacity-50 cursor-not-allowed"
           )}
           aria-label="Click to upload image"
@@ -137,7 +137,7 @@ export function ImageUpload({
             <p className="text-sm font-medium">
               {uploading ? "Uploading..." : "Click to upload banner image"}
             </p>
-            <p className="text-xs text-gray-400">JPG, PNG, WEBP up to {MAX_IMAGE_SIZE_MB}MB</p>
+            <p className="text-xs text-black">JPG, PNG, WEBP up to {MAX_IMAGE_SIZE_MB}MB</p>
           </div>
         </button>
       )}

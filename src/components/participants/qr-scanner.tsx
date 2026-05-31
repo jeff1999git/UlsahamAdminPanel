@@ -14,8 +14,8 @@ const Scanner = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="w-full aspect-square bg-black/10 rounded-lg flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-black" />
       </div>
     ),
   }
@@ -83,7 +83,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
         {cameraError ? (
           <div className="aspect-square flex flex-col items-center justify-center gap-3 bg-gray-50 p-6 text-center">
             <AlertCircle className="h-10 w-10 text-red-500" />
-            <p className="text-sm text-gray-600">{cameraError}</p>
+            <p className="text-sm text-black">{cameraError}</p>
             <Button
               variant="outline"
               size="sm"
@@ -168,7 +168,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
         </Card>
       )}
 
-      <div className="text-center text-sm text-gray-500">
+      <div className="text-center text-sm text-black">
         <p>Point the camera at a participant's QR code</p>
         <p className="text-xs mt-1">Scanner resets automatically after each scan</p>
       </div>

@@ -40,28 +40,28 @@ async function DashboardContent() {
           value={stats.publishedEvents}
           icon={CalendarCheck}
           description="Live events"
-          iconClassName="bg-green-100"
+          iconClassName="bg-[#014421]/10"
         />
         <StatsCard
           title="Upcoming"
           value={stats.upcomingEvents}
           icon={TrendingUp}
           description="Future events"
-          iconClassName="bg-blue-100"
+          iconClassName="bg-[#014421]/10"
         />
         <StatsCard
           title="Participants"
           value={stats.totalParticipants.toLocaleString("en-IN")}
           icon={Users}
           description="Total registered"
-          iconClassName="bg-purple-100"
+          iconClassName="bg-[#014421]/10"
         />
         <StatsCard
           title="Revenue"
           value={formatCurrency(stats.totalRevenue)}
           icon={DollarSign}
           description="From paid events"
-          iconClassName="bg-yellow-100"
+          iconClassName="bg-[#014421]/10"
         />
       </div>
 

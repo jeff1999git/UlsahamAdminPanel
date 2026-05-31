@@ -37,14 +37,14 @@ export function Header({ username, role }: HeaderProps) {
         </div>
 
         {/* Page title */}
-        <h1 className="hidden lg:block text-xl font-bold text-gray-900">{title}</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-black">{title}</h1>
 
         {/* User info */}
         {username && (
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-gray-900">{username}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-medium text-black">{username}</p>
+              <p className="text-xs text-black">
                 {role === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
               </p>
             </div>

@@ -101,24 +101,24 @@ export function EventTable({ events }: EventTableProps) {
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-gray-900 text-sm">{event.name}</p>
-                    <p className="text-xs text-gray-400">{event.venue}</p>
+                    <p className="font-medium text-black text-sm">{event.name}</p>
+                    <p className="text-xs text-black">{event.venue}</p>
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="text-sm text-gray-600 whitespace-nowrap">
+              <TableCell className="text-sm text-black whitespace-nowrap">
                 {formatDate(event.date)}
               </TableCell>
               <TableCell>
                 <EventStatusBadge status={event.status} />
               </TableCell>
-              <TableCell className="text-sm text-gray-600">
+              <TableCell className="text-sm text-black">
                 {event._count.participants}
                 {event.capacity && (
-                  <span className="text-gray-400"> / {event.capacity}</span>
+                  <span className="text-black"> / {event.capacity}</span>
                 )}
               </TableCell>
-              <TableCell className="text-sm text-gray-600 whitespace-nowrap">
+              <TableCell className="text-sm text-black whitespace-nowrap">
                 {event.isFree ? (
                   <span className="text-green-600 font-medium">Free</span>
                 ) : (
