@@ -115,6 +115,28 @@ export async function markAttendance(ticketCode: string, eventId: string) {
   return { found: true, alreadyAttended: false, participant: updated }
 }
 
+export async function pruneOldEventParticipants() {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 14) // 2 weeks after event date
+
+  // Find events that ended more than 2 weeks ago and still have participant records
+  const events = await prisma.event.findMany({
+    where: { date: { lt: cutoff } },
+    select: { id: true, _count: { select: { participants: true } } },
+  })
+
+  const stale = events.filter((e) => e._count.participants > 0)
+
+  for (const event of stale) {
+    // Snapshot the count onto the event before deleting
+    await prisma.event.update({
+      where: { id: event.id },
+      data: { archivedParticipantCount: event._count.participants },
+    })
+    await prisma.participant.deleteMany({ where: { eventId: event.id } })
+  }
+}
+
 export async function markAttendanceByCode(ticketCode: string) {
   const eventInclude = { select: { id: true, name: true, date: true, venue: true } } as const
 

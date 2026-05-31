@@ -1,19 +1,13 @@
 import { Suspense } from "react"
 import Link from "next/link"
-import { Plus, Search } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { EventTable } from "@/components/events/event-table"
+import { EventsFilter } from "@/components/events/events-filter"
 import { Pagination } from "@/components/shared/data-table"
 import { TableSkeleton } from "@/components/shared/skeleton-loaders"
 import { getEvents } from "@/services/event.service"
+import { pruneOldEventParticipants } from "@/repositories/participant.repository"
 import type { Metadata } from "next"
 import type { EventStatus } from "@prisma/client"
 
@@ -30,6 +24,8 @@ async function EventsList({ searchParams }: { searchParams: SearchParams }) {
   const search = searchParams.search ?? ""
   const statusParam = searchParams.status ?? ""
   const status = (statusParam === "all" ? "" : statusParam) as EventStatus | ""
+
+  pruneOldEventParticipants().catch(() => {})
 
   const { events, total, totalPages } = await getEvents({
     page,
@@ -86,32 +82,9 @@ export default async function EventsPage({
       </div>
 
       {/* Filters */}
-      <form method="GET" className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black" />
-          <Input
-            name="search"
-            placeholder="Search events..."
-            defaultValue={params.search}
-            className="pl-9"
-          />
-        </div>
-        <Select name="status" defaultValue={params.status ?? "all"}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All Statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="DRAFT">Draft</SelectItem>
-            <SelectItem value="PUBLISHED">Published</SelectItem>
-            <SelectItem value="CANCELLED">Cancelled</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button type="submit" variant="outline">
-          Filter
-        </Button>
-      </form>
+      <Suspense fallback={<div className="h-10" />}>
+        <EventsFilter defaultSearch={params.search} defaultStatus={params.status} />
+      </Suspense>
 
       <Suspense fallback={<TableSkeleton rows={5} cols={1} />}>
         <EventsList searchParams={params} />

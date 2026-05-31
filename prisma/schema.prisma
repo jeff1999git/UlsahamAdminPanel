@@ -37,11 +37,12 @@ model Event {
   isFree         Boolean     @default(true)
   amount         Float?
   status         EventStatus @default(DRAFT)
-  capacity       Int?
-  featured       Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  participants   Participant[]
+  capacity                Int?
+  featured                Boolean     @default(false)
+  archivedParticipantCount Int        @default(0)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  participants            Participant[]
 
   @@index([date])
   @@index([status])

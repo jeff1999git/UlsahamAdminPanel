@@ -40,6 +40,10 @@ import { deleteEventAction, toggleEventStatusAction } from "@/actions/event.acti
 import { formatDate, formatCurrency } from "@/lib/utils"
 import type { EventWithParticipantCount } from "@/types/event.types"
 
+function participantCount(event: EventWithParticipantCount): number {
+  return event._count.participants || (event as unknown as { archivedParticipantCount: number }).archivedParticipantCount || 0
+}
+
 interface EventTableProps {
   events: EventWithParticipantCount[]
 }
@@ -103,7 +107,7 @@ export function EventTable({ events }: EventTableProps) {
                     <span className="text-xs text-black/60">{formatDate(event.date)}</span>
                     <span className="text-xs text-black/40">·</span>
                     <span className="text-xs text-black/60">
-                      {event._count.participants} participant{event._count.participants !== 1 ? "s" : ""}
+                      {participantCount(event)} participant{participantCount(event) !== 1 ? "s" : ""}
                     </span>
                   </div>
                 </div>
@@ -167,7 +171,7 @@ export function EventTable({ events }: EventTableProps) {
                 <div className="flex items-center gap-2.5">
                   <Users className="h-4 w-4 text-black/40 shrink-0" />
                   <span className="text-sm text-black">
-                    {selected._count.participants} registered
+                    {participantCount(selected)} registered
                     {selected.capacity ? ` / ${selected.capacity} capacity` : ""}
                   </span>
                 </div>
@@ -236,8 +240,8 @@ export function EventTable({ events }: EventTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Event</AlertDialogTitle>
             <AlertDialogDescription>
-              {selected && selected._count.participants > 0
-                ? `This event has ${selected._count.participants} participant(s). It will be marked as Cancelled instead of deleted.`
+              {selected && participantCount(selected) > 0
+                ? `This event has ${participantCount(selected)} participant(s). It will be marked as Cancelled instead of deleted.`
                 : "Are you sure you want to delete this event? This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
