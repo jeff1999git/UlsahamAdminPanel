@@ -24,7 +24,7 @@ export function Sidebar({ username, role }: SidebarProps) {
       {/* Logo */}
       <div className="flex items-center px-4 py-4 border-b border-white/10">
         <Image
-          src="/brand_logo.png"
+          src="/brand_logo.avif"
           alt="Ulsaham Entertainments"
           width={180}
           height={90}

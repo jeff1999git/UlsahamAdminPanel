@@ -27,7 +27,7 @@ export function Header({ username, role }: HeaderProps) {
         {/* Mobile logo */}
         <div className="lg:hidden bg-[#014421] rounded-xl px-2 py-1">
           <Image
-            src="/brand_logo.png"
+            src="/brand_logo.avif"
             alt="Ulsaham Entertainments"
             width={110}
             height={55}

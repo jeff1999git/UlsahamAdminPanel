@@ -60,7 +60,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-4">
           <Image
-            src="/brand_logo.png"
+            src="/brand_logo.avif"
             alt={APP_NAME}
             width={220}
             height={110}

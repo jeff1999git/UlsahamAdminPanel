@@ -138,7 +138,7 @@ async function generateTicketCanvas(
   const [qrImg, posterImg, logoImg] = await Promise.all([
     loadSvgAsImage(svgEl),
     opts.bannerImageUrl ? loadImageFromUrl(opts.bannerImageUrl) : Promise.resolve(null),
-    loadImageFromUrl("/brand_logo.png"),
+    loadImageFromUrl("/brand_logo.avif"),
   ])
 
   const W = 600
@@ -176,8 +176,7 @@ async function generateTicketCanvas(
     20 +                    // divider
     20 +                    // participant label
     30 +                    // participant name
-    24 +                    // admits
-    22                      // ticket code
+    24                      // admits
   const QR_BOX_Y = INFO_Y_START + INFO_H + 16
   const QR_BOX_H = QR_SIZE + QR_BOX_PAD * 2 + 30
   const FOOTER_Y = QR_BOX_Y + QR_BOX_H + 28
@@ -275,11 +274,6 @@ async function generateTicketCanvas(
     W / 2,
     y
   )
-  y += 24
-
-  ctx.fillStyle = "#666"
-  ctx.font = "10px 'Courier New', Courier, monospace"
-  ctx.fillText(opts.ticketCode, W / 2, y)
 
   // ── White QR box ──────────────────────────────────────────────
   ctx.fillStyle = "#fff"
