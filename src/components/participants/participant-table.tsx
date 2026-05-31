@@ -16,11 +16,14 @@ import {
   Hash,
   Users,
   MessageCircle,
+  Banknote,
+  Lock,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -43,6 +46,7 @@ import { ParticipantForm } from "@/components/participants/participant-form"
 import {
   deleteParticipantAction,
   toggleAttendanceAction,
+  toggleAmountPaidAction,
   exportParticipantsAction,
 } from "@/actions/participant.actions"
 import { formatDate, formatDateTime } from "@/lib/utils"
@@ -75,6 +79,19 @@ export function ParticipantTable({
   const [selectedMobile, setSelectedMobile] = useState<Participant | null>(null)
   const [phoneContact, setPhoneContact] = useState<{ name: string; phone: string } | null>(null)
 
+  // Mode toggle: false = payment mode, true = attendance mode (only shown on event day)
+  const [attendanceMode, setAttendanceMode] = useState(false)
+
+  const isEventDay = (() => {
+    const today = new Date()
+    const evDate = new Date(eventDate)
+    return (
+      today.getFullYear() === evDate.getFullYear() &&
+      today.getMonth() === evDate.getMonth() &&
+      today.getDate() === evDate.getDate()
+    )
+  })()
+
   function handleDelete(id: string) {
     startTransition(async () => {
       const result = await deleteParticipantAction(id, eventId)
@@ -97,6 +114,17 @@ export function ParticipantTable({
     })
   }
 
+  function handleToggleAmountPaid(id: string, currentPaid: boolean) {
+    startTransition(async () => {
+      const result = await toggleAmountPaidAction(id, eventId, !currentPaid)
+      if (result.success) {
+        toast.success(result.data.amountPaid ? "Payment marked" : "Payment unmarked")
+      } else {
+        toast.error(result.error)
+      }
+    })
+  }
+
   async function handleExportXLSX() {
     try {
       const all = await exportParticipantsAction(eventId)
@@ -107,6 +135,7 @@ export function ParticipantTable({
         "Email": p.email ?? "",
         "Age": p.age,
         "No. of Participants": p.numberOfParticipants,
+        "Amount Paid": p.amountPaid ? "Yes" : "No",
         "Attended": p.attended ? "Yes" : "No",
         "Attended At": p.attendedAt ? formatDateTime(p.attendedAt) : "",
         "Registered At": formatDateTime(p.registeredAt),
@@ -133,6 +162,29 @@ export function ParticipantTable({
           Export Excel
         </Button>
       </div>
+
+      {/* Mode toggle — only on event day */}
+      {isEventDay && (
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-[#014421]/30 bg-[#014421]/5">
+          <div>
+            <p className="text-sm font-semibold text-black">
+              {attendanceMode ? "Attendance Mode" : "Payment Mode"}
+            </p>
+            <p className="text-xs text-black/50">
+              {attendanceMode ? "Checkboxes mark attendance" : "Checkboxes mark payment"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Banknote className="h-4 w-4 text-black/40" />
+            <Switch
+              checked={attendanceMode}
+              onCheckedChange={setAttendanceMode}
+              aria-label="Toggle between payment and attendance mode"
+            />
+            <UserCheck className="h-4 w-4 text-[#014421]" />
+          </div>
+        </div>
+      )}
 
       {participants.length === 0 ? (
         <TableEmpty
@@ -177,17 +229,31 @@ export function ParticipantTable({
                         </div>
                       </div>
 
-                      {/* Attendance checkbox */}
+                      {/* Checkbox — payment mode or attendance mode */}
                       <div
-                        className="flex items-center"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Checkbox
-                          checked={p.attended}
-                          onCheckedChange={() => handleToggleAttendance(p.id, p.attended)}
-                          aria-label={p.attended ? "Unmark attendance" : "Mark attendance"}
-                          className="h-5 w-5"
-                        />
+                        {attendanceMode ? (
+                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 cursor-pointer">
+                            <Checkbox
+                              checked={p.attended}
+                              onCheckedChange={() => handleToggleAttendance(p.id, p.attended)}
+                              aria-label={p.attended ? "Unmark attendance" : "Mark attendance"}
+                              className="h-4 w-4"
+                            />
+                            <span className="text-xs font-semibold text-blue-700 leading-none">Present</span>
+                          </label>
+                        ) : (
+                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 cursor-pointer">
+                            <Checkbox
+                              checked={p.amountPaid ?? false}
+                              onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
+                              aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
+                              className="h-4 w-4 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                            />
+                            <span className="text-xs font-semibold text-emerald-700 leading-none">Paid</span>
+                          </label>
+                        )}
                       </div>
 
                       <ChevronRight className="h-4 w-4 text-black/30 shrink-0" />
@@ -207,6 +273,7 @@ export function ParticipantTable({
                   <TableHead>Ticket Code</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Participants</TableHead>
+                  <TableHead>Paid</TableHead>
                   <TableHead>Attendance</TableHead>
                   <TableHead>Registered</TableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
@@ -233,6 +300,16 @@ export function ParticipantTable({
                       {p.numberOfParticipants}
                     </TableCell>
                     <TableCell>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={p.amountPaid ?? false}
+                          onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
+                          aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
+                          className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       {p.attended ? (
                         <Badge variant="success" className="text-xs">Attended</Badge>
                       ) : (
@@ -244,16 +321,28 @@ export function ParticipantTable({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <QRCodeModal
-                          ticketCode={p.ticketCode}
-                          participantName={p.name}
-                          qrCodeUrl={p.qrCodeUrl}
-                          eventName={eventName}
-                          eventDate={eventDate}
-                          eventVenue={eventVenue}
-                          numberOfParticipants={p.numberOfParticipants}
-                          bannerImageUrl={eventBannerUrl}
-                        />
+                        {p.amountPaid ? (
+                          <QRCodeModal
+                            ticketCode={p.ticketCode}
+                            participantName={p.name}
+                            qrCodeUrl={p.qrCodeUrl}
+                            eventName={eventName}
+                            eventDate={eventDate}
+                            eventVenue={eventVenue}
+                            numberOfParticipants={p.numberOfParticipants}
+                            bannerImageUrl={eventBannerUrl}
+                          />
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-black/30 cursor-not-allowed"
+                            disabled
+                            title="Ticket locked — payment pending"
+                          >
+                            <Lock className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -371,20 +460,37 @@ export function ParticipantTable({
                 )}
               </div>
 
+              {/* Payment status in detail */}
+              <div className="flex items-center gap-2.5">
+                <Banknote className="h-4 w-4 text-black/40 shrink-0" />
+                {selectedMobile.amountPaid ? (
+                  <Badge variant="success" className="text-xs">Amount Paid</Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-xs">Payment Pending</Badge>
+                )}
+              </div>
+
               {/* Actions */}
               <div className="border-t pt-3 flex flex-col gap-2">
-                {/* QR code */}
-                <QRCodeModal
-                  ticketCode={selectedMobile.ticketCode}
-                  participantName={selectedMobile.name}
-                  qrCodeUrl={selectedMobile.qrCodeUrl}
-                  eventName={eventName}
-                  eventDate={eventDate}
-                  eventVenue={eventVenue}
-                  numberOfParticipants={selectedMobile.numberOfParticipants}
-                  bannerImageUrl={eventBannerUrl}
-                  fullWidth
-                />
+                {/* QR code — locked until payment */}
+                {selectedMobile.amountPaid ? (
+                  <QRCodeModal
+                    ticketCode={selectedMobile.ticketCode}
+                    participantName={selectedMobile.name}
+                    qrCodeUrl={selectedMobile.qrCodeUrl}
+                    eventName={eventName}
+                    eventDate={eventDate}
+                    eventVenue={eventVenue}
+                    numberOfParticipants={selectedMobile.numberOfParticipants}
+                    bannerImageUrl={eventBannerUrl}
+                    fullWidth
+                  />
+                ) : (
+                  <Button variant="outline" size="sm" className="w-full text-black/40" disabled>
+                    <Lock className="h-3.5 w-3.5 mr-1.5" />
+                    Ticket locked until payment
+                  </Button>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   {/* Edit */}

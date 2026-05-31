@@ -8,6 +8,7 @@ import {
   updateExistingParticipant,
   deleteParticipantWithCleanup,
   toggleAttendance,
+  toggleAmountPaid,
   getAllParticipants,
   getParticipants,
   scanGlobal,
@@ -159,6 +160,34 @@ export async function toggleAttendanceAction(
     return { success: true, data: participant }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to update attendance"
+    return { success: false, error: msg }
+  }
+}
+
+export async function toggleAmountPaidAction(
+  id: string,
+  eventId: string,
+  amountPaid: boolean
+): Promise<ActionResult<Participant>> {
+  const session = await getSession()
+
+  try {
+    const participant = await toggleAmountPaid(id, amountPaid)
+
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "PARTICIPANT_UPDATED",
+      entity: "Participant",
+      entityId: id,
+      description: `${amountPaid ? "Marked" : "Unmarked"} payment for ${participant.name}`,
+      metadata: { eventId },
+    })
+
+    revalidatePath(`/admin/events/${eventId}/participants`)
+    return { success: true, data: participant }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to update payment status"
     return { success: false, error: msg }
   }
 }

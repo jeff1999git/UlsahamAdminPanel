@@ -67,6 +67,7 @@ model Participant {
   ticketCode           String    @unique
   qrCodeUrl            String
   qrCodeImageId        String
+  amountPaid           Boolean   @default(false)
   attended             Boolean   @default(false)
   attendedAt           DateTime?
   registeredAt         DateTime  @default(now())

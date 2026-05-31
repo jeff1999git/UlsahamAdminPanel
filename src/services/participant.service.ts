@@ -105,6 +105,10 @@ export async function toggleAttendance(id: string, attended: boolean) {
   })
 }
 
+export async function toggleAmountPaid(id: string, amountPaid: boolean) {
+  return updateParticipant(id, { amountPaid })
+}
+
 export async function scanAndMarkAttendance(ticketCode: string, eventId: string) {
   return markAttendance(ticketCode, eventId)
 }
