@@ -1,6 +1,6 @@
 "use client"
 
-import { Zap } from "lucide-react"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { adminNavItems } from "@/config/nav"
 
@@ -25,11 +25,15 @@ export function Header({ username, role }: HeaderProps) {
     <header className="sticky top-0 z-30 bg-background border-b border-black px-4 sm:px-6 py-4">
       <div className="flex items-center justify-between">
         {/* Mobile logo */}
-        <div className="flex items-center gap-3 lg:hidden">
-          <div className="w-7 h-7 bg-[#014421] rounded-lg flex items-center justify-center">
-            <Zap className="h-4 w-4 text-[#FEE715]" />
-          </div>
-          <span className="font-bold text-sm text-[#014421]">Ulsaham</span>
+        <div className="lg:hidden bg-[#014421] rounded-xl px-2 py-1">
+          <Image
+            src="/brand_logo.png"
+            alt="Ulsaham Entertainments"
+            width={110}
+            height={55}
+            style={{ height: "auto" }}
+            priority
+          />
         </div>
 
         {/* Page title */}

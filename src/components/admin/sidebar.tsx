@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { LogOut, Zap } from "lucide-react"
+import { LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { adminNavItems } from "@/config/nav"
-import { APP_NAME } from "@/constants"
 import { logoutAction } from "@/actions/auth.actions"
 
 interface SidebarProps {
@@ -22,14 +22,16 @@ export function Sidebar({ username, role }: SidebarProps) {
       aria-label="Admin navigation sidebar"
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
-        <div className="w-8 h-8 bg-[#FEE715] rounded-lg flex items-center justify-center">
-          <Zap className="h-5 w-5 text-[#014421]" />
-        </div>
-        <div>
-          <p className="font-bold text-sm leading-tight">Ulsaham</p>
-          <p className="text-xs text-white/60 leading-tight">Entertainments</p>
-        </div>
+      <div className="flex items-center px-4 py-4 border-b border-white/10">
+        <Image
+          src="/brand_logo.png"
+          alt="Ulsaham Entertainments"
+          width={180}
+          height={90}
+          style={{ height: "auto" }}
+          className="rounded-lg"
+          priority
+        />
       </div>
 
       {/* Nav */}

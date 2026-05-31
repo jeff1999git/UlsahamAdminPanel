@@ -135,9 +135,10 @@ async function generateTicketCanvas(
     bannerImageUrl?: string | null
   }
 ): Promise<HTMLCanvasElement> {
-  const [qrImg, posterImg] = await Promise.all([
+  const [qrImg, posterImg, logoImg] = await Promise.all([
     loadSvgAsImage(svgEl),
     opts.bannerImageUrl ? loadImageFromUrl(opts.bannerImageUrl) : Promise.resolve(null),
+    loadImageFromUrl("/brand_logo.png"),
   ])
 
   const W = 600
@@ -203,19 +204,25 @@ async function generateTicketCanvas(
     drawCoverImage(ctx, posterImg, QR_BOX_X, BODY_Y + 16, QR_BOX_W, POSTER_H, 12)
   }
 
-  // ── ULSAHAM ───────────────────────────────────────────────────
-  ctx.fillStyle = YELLOW
-  ctx.font = "bold 76px 'Courier New', Courier, monospace"
-  ctx.fillText("ULSAHAM", W / 2, 132)
-
-  // ── ENTERTAINMENTS badge ──────────────────────────────────────
-  const BW = 378, BH = 48, BX = (W - BW) / 2, BY = 160
-  ctx.fillStyle = YELLOW
-  drawRoundRect(ctx, BX, BY, BW, BH, 24)
-  ctx.fill()
-  ctx.fillStyle = GREEN
-  ctx.font = "bold 18px Arial, Helvetica, sans-serif"
-  ctx.fillText("ENTERTAINMENTS", W / 2, BY + 32)
+  // ── Brand logo ────────────────────────────────────────────────
+  if (logoImg) {
+    const maxLogoW = W - 80
+    const maxLogoH = HEADER_H - 24
+    const logoScale = Math.min(
+      maxLogoW / logoImg.naturalWidth,
+      maxLogoH / logoImg.naturalHeight
+    )
+    const lw = logoImg.naturalWidth * logoScale
+    const lh = logoImg.naturalHeight * logoScale
+    ctx.drawImage(logoImg, (W - lw) / 2, (HEADER_H - lh) / 2, lw, lh)
+  } else {
+    ctx.fillStyle = YELLOW
+    ctx.font = "bold 64px 'Courier New', Courier, monospace"
+    ctx.fillText("ULSAHAM", W / 2, 120)
+    ctx.fillStyle = YELLOW
+    ctx.font = "bold 16px Arial, sans-serif"
+    ctx.fillText("ENTERTAINMENTS", W / 2, 165)
+  }
 
   // ── Event info (yellow area) ───────────────────────────────────
   let y = INFO_Y_START
