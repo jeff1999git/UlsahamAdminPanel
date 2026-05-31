@@ -1,9 +1,19 @@
 "use client"
 
-import Link from "next/link"
 import Image from "next/image"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserCog, Settings, LogOut } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { adminNavItems } from "@/config/nav"
+import { logoutAction } from "@/actions/auth.actions"
 
 interface HeaderProps {
   username?: string
@@ -22,9 +32,7 @@ export function Header({ username, role }: HeaderProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
 
-  const headerItems = adminNavItems.filter(
-    (item) => item.headerOnly && (!item.superAdminOnly || role === "SUPER_ADMIN")
-  )
+  const isSuperAdmin = role === "SUPER_ADMIN"
 
   return (
     <header className="sticky top-0 z-30 bg-background border-b border-black px-4 sm:px-6 py-4">
@@ -44,54 +52,65 @@ export function Header({ username, role }: HeaderProps) {
         {/* Page title */}
         <h1 className="hidden lg:block text-xl font-bold text-black">{title}</h1>
 
-        {/* Right side: header nav icons + user info */}
-        <div className="flex items-center gap-2">
-          {/* Settings-type icon links */}
-          {headerItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                aria-label={item.label}
-                className={`p-2 rounded-lg transition-colors ${
-                  isActive
-                    ? "bg-[#014421] text-white"
-                    : "text-black hover:bg-[#014421]/10"
-                }`}
-              >
-                <Icon className="h-5 w-5" aria-hidden="true" />
-              </Link>
-            )
-          })}
+        {/* Profile dropdown */}
+        {username && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-3 rounded-lg hover:bg-black/5 px-2 py-1 transition-colors focus:outline-none">
+                <div className="hidden sm:block text-right">
+                  <p className="text-sm font-medium text-black">{username}</p>
+                  <p className="text-xs text-black">
+                    {isSuperAdmin ? "Super Admin" : "Admin"}
+                  </p>
+                </div>
+                <div className="w-9 h-9 bg-[#014421] rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-white">
+                    {username[0]?.toUpperCase()}
+                  </span>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
 
-          {/* Divider */}
-          {headerItems.length > 0 && username && (
-            <div className="w-px h-6 bg-black/20 mx-1" />
-          )}
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="font-normal">
+                <p className="font-semibold text-black">{username}</p>
+                <p className="text-xs text-black/60">{isSuperAdmin ? "Super Admin" : "Admin"}</p>
+              </DropdownMenuLabel>
 
-          {/* User info */}
-          {username && (
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium text-black">{username}</p>
-                <p className="text-xs text-black">
-                  {role === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
-                </p>
-              </div>
-              <div
-                className="w-8 h-8 bg-[#014421] rounded-full flex items-center justify-center"
-                aria-hidden="true"
-              >
-                <span className="text-sm font-bold text-white">
-                  {username[0]?.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+              <DropdownMenuSeparator />
+
+              {isSuperAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/admins" className="flex items-center gap-2 cursor-pointer">
+                    <UserCog className="h-4 w-4" />
+                    Admin Accounts
+                  </Link>
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer">
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem asChild>
+                <form action={logoutAction} className="w-full">
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 w-full text-red-600 focus:text-red-600"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </form>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </header>
   )

@@ -3,10 +3,8 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { adminNavItems } from "@/config/nav"
-import { logoutAction } from "@/actions/auth.actions"
 
 interface SidebarProps {
   username: string
@@ -60,25 +58,6 @@ export function Sidebar({ username, role }: SidebarProps) {
           })}
       </nav>
 
-      {/* User & Logout */}
-      <div className="px-3 py-4 border-t border-white/10">
-        <div className="px-3 py-2 mb-2">
-          <p className="text-sm font-medium text-white truncate">{username}</p>
-          <p className="text-xs text-white/60">
-            {role === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
-          </p>
-        </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-white/80 hover:text-white sidebar-item-hover transition-all"
-            aria-label="Logout"
-          >
-            <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
-            Logout
-          </button>
-        </form>
-      </div>
     </aside>
   )
 }
