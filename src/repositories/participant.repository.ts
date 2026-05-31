@@ -114,3 +114,23 @@ export async function markAttendance(ticketCode: string, eventId: string) {
 
   return { found: true, alreadyAttended: false, participant: updated }
 }
+
+export async function markAttendanceByCode(ticketCode: string) {
+  const eventInclude = { select: { id: true, name: true, date: true, venue: true } } as const
+
+  const participant = await prisma.participant.findUnique({
+    where: { ticketCode },
+    include: { event: eventInclude },
+  })
+
+  if (!participant) return { found: false, alreadyAttended: false, participant: null }
+  if (participant.attended) return { found: true, alreadyAttended: true, participant }
+
+  const updated = await prisma.participant.update({
+    where: { id: participant.id },
+    data: { attended: true, attendedAt: new Date() },
+    include: { event: eventInclude },
+  })
+
+  return { found: true, alreadyAttended: false, participant: updated }
+}

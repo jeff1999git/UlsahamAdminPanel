@@ -9,6 +9,7 @@ import {
   deleteParticipant,
   countParticipantsForEvent,
   markAttendance,
+  markAttendanceByCode,
 } from "@/repositories/participant.repository"
 import { findEventById } from "@/repositories/event.repository"
 import { generateAndUploadQRCode } from "@/services/qr.service"
@@ -110,4 +111,8 @@ export async function scanAndMarkAttendance(ticketCode: string, eventId: string)
 
 export async function checkTicketCode(ticketCode: string) {
   return findParticipantByTicketCode(ticketCode)
+}
+
+export async function scanGlobal(ticketCode: string) {
+  return markAttendanceByCode(ticketCode)
 }
