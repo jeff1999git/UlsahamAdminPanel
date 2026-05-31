@@ -102,7 +102,7 @@ export function EventTable({ events }: EventTableProps) {
                   )}
                   <div>
                     <p className="font-medium text-black text-sm">{event.name}</p>
-                    <p className="text-xs text-black">{event.venue}</p>
+                    <p className="text-xs text-black font-medium">{event.venue}</p>
                   </div>
                 </div>
               </TableCell>
@@ -120,7 +120,7 @@ export function EventTable({ events }: EventTableProps) {
               </TableCell>
               <TableCell className="text-sm text-black whitespace-nowrap">
                 {event.isFree ? (
-                  <span className="text-green-600 font-medium">Free</span>
+                  <span className="text-[#014421] font-medium">Free</span>
                 ) : (
                   formatCurrency(event.amount ?? 0)
                 )}

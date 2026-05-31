@@ -360,7 +360,7 @@ export function QRCodeModal({
           <div className="text-center">
             <p className="font-semibold">{participantName}</p>
             <p className="text-xs font-mono mt-1">{ticketCode}</p>
-            <p className="text-xs mt-0.5 text-muted-foreground">{eventName}</p>
+            <p className="text-xs mt-0.5 text-black">{eventName}</p>
           </div>
           <Button onClick={handleDownload} disabled={downloading} className="w-full">
             <Download className="h-4 w-4 mr-2" />

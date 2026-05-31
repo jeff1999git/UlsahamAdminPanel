@@ -81,7 +81,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
     <div className="space-y-4 max-w-md mx-auto">
       <div className="relative rounded-xl overflow-hidden border-2 border-[#014421]">
         {cameraError ? (
-          <div className="aspect-square flex flex-col items-center justify-center gap-3 bg-gray-50 p-6 text-center">
+          <div className="aspect-square flex flex-col items-center justify-center gap-3 bg-black/5 p-6 text-center">
             <AlertCircle className="h-10 w-10 text-red-500" />
             <p className="text-sm text-black">{cameraError}</p>
             <Button

@@ -65,7 +65,7 @@ export function AdminTable({ admins }: AdminTableProps) {
 
   if (admins.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
+      <div className="text-center py-12 text-black">
         No admin accounts yet. Create one using the button above.
       </div>
     )
@@ -100,10 +100,10 @@ export function AdminTable({ admins }: AdminTableProps) {
                   </Badge>
                 </div>
               </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
+              <TableCell className="text-black text-sm">
                 {admin.lastLoginAt ? formatDate(admin.lastLoginAt) : "Never"}
               </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
+              <TableCell className="text-black text-sm">
                 {formatDate(admin.createdAt)}
               </TableCell>
               <TableCell>

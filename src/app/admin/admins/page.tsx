@@ -20,7 +20,7 @@ export default async function AdminsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Admin Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="text-black text-sm mt-1">
             Create and manage admin accounts. Only you (Super Admin) can access this page.
           </p>
         </div>

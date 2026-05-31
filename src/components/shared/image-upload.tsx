@@ -93,7 +93,7 @@ export function ImageUpload({
       />
 
       {preview ? (
-        <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200">
+        <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-black">
           <Image
             src={preview}
             alt="Event banner preview"

@@ -36,13 +36,13 @@ export default async function ParticipantsPage({ params }: Props) {
         <div>
           <Link
             href="/admin/events"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
+            className="inline-flex items-center gap-1 text-sm text-black hover:text-[#014421] mb-2"
           >
             <ArrowLeft className="h-3 w-3" />
             Back to Events
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">Participants</h1>
-          <p className="text-muted-foreground text-sm mt-1">{event.name}</p>
+          <p className="text-black text-sm mt-1">{event.name}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link

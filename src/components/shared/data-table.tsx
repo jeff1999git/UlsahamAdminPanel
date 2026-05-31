@@ -40,7 +40,7 @@ export function Pagination({ page, totalPages, baseUrl, searchParams = {} }: Pag
 
       {range.map((item, i) =>
         item === "..." ? (
-          <span key={`ellipsis-${i}`} className="px-2 text-muted-foreground text-sm">
+          <span key={`ellipsis-${i}`} className="px-2 text-black text-sm">
             …
           </span>
         ) : (
@@ -82,7 +82,7 @@ export function TableEmpty({
   description = "Try adjusting your search or filters.",
 }: TableEmptyProps) {
   return (
-    <div className="text-center py-12 text-muted-foreground">
+    <div className="text-center py-12 text-black">
       <p className="text-base font-medium">{message}</p>
       <p className="text-sm mt-1">{description}</p>
     </div>

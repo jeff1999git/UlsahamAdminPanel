@@ -28,13 +28,13 @@ export default async function ScanPage({ params }: Props) {
       <div>
         <Link
           href={`/admin/events/${id}/participants`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
+          className="inline-flex items-center gap-1 text-sm text-black hover:text-[#014421] mb-2"
         >
           <ArrowLeft className="h-3 w-3" />
           Back to Participants
         </Link>
         <h1 className="text-2xl font-bold tracking-tight">QR Scanner</h1>
-        <p className="text-muted-foreground text-sm mt-1">{event.name}</p>
+        <p className="text-black text-sm mt-1">{event.name}</p>
       </div>
       <QRScanner eventId={id} />
     </div>
