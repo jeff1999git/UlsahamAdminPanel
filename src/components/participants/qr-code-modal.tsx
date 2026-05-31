@@ -111,6 +111,19 @@ function drawCoverImage(
   ctx.restore()
 }
 
+function truncateText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  font: string
+): string {
+  ctx.font = font
+  if (ctx.measureText(text).width <= maxWidth) return text
+  let t = text
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxWidth) t = t.slice(0, -1)
+  return t + "…"
+}
+
 async function loadSvgAsImage(svgEl: SVGSVGElement): Promise<HTMLImageElement> {
   const serializer = new XMLSerializer()
   const svgStr = serializer.serializeToString(svgEl)
@@ -146,41 +159,22 @@ async function generateTicketCanvas(
   const YELLOW = "#FEE715"
   const QR_BOX_X = 99
   const QR_BOX_W = 402
-  const QR_SIZE = 200
+  const QR_SIZE = 260
   const QR_BOX_PAD = 22
   const HEADER_H = 255
   const BODY_Y = 225
   const POSTER_H = 210
 
-  // Measure event name lines (cap at 3)
-  const probe = document.createElement("canvas").getContext("2d")!
-  const nameLines = wrapText(
-    probe,
-    opts.eventName,
-    QR_BOX_W - 20,
-    "bold 22px Arial, sans-serif"
-  ).slice(0, 3)
-
-  // Info section starts below banner (if present) or just below header
   const INFO_Y_START = posterImg
     ? BODY_Y + 16 + POSTER_H + 16
-    : BODY_Y + 30
+    : BODY_Y + 24
 
-  // Compute total info section height so QR box Y is fixed regardless of draw order
-  const INFO_H =
-    28 +                    // "EVENT TICKET" label
-    nameLines.length * 30 + // event name (per line)
-    10 +                    // gap after name
-    24 +                    // date
-    22 +                    // venue
-    20 +                    // divider
-    20 +                    // participant label
-    30 +                    // participant name
-    24                      // admits
+  // "EVENT TICKET" heading (44) + 3 rows × 60px each
+  const INFO_H = 44 + 3 * 60
   const QR_BOX_Y = INFO_Y_START + INFO_H + 16
   const QR_BOX_H = QR_SIZE + QR_BOX_PAD * 2 + 30
-  const FOOTER_Y = QR_BOX_Y + QR_BOX_H + 28
-  const H = FOOTER_Y + 82
+  const FOOTER_Y = QR_BOX_Y + QR_BOX_H + 20
+  const H = FOOTER_Y + 70
 
   const canvas = document.createElement("canvas")
   canvas.width = W
@@ -223,57 +217,50 @@ async function generateTicketCanvas(
     ctx.fillText("ENTERTAINMENTS", W / 2, 165)
   }
 
-  // ── Event info (yellow area) ───────────────────────────────────
+  // ── Event info – 2-column grid ────────────────────────────────
   let y = INFO_Y_START
-
-  ctx.fillStyle = "#2d6e3a"
-  ctx.font = "bold 10px Arial, sans-serif"
-  ctx.fillText("E V E N T   T I C K E T", W / 2, y)
-  y += 28
 
   ctx.fillStyle = "#000"
   ctx.font = "bold 22px Arial, sans-serif"
-  for (const line of nameLines) {
-    ctx.fillText(line, W / 2, y)
-    y += 30
-  }
-  y += 10
+  ctx.textAlign = "center"
+  ctx.fillText("EVENT TICKET", W / 2, y)
+  y += 44
 
-  ctx.fillStyle = "#222"
-  ctx.font = "13px Arial, sans-serif"
-  ctx.fillText(opts.eventDate, W / 2, y)
-  y += 24
+  const COL_L = W / 4
+  const COL_R = (3 * W) / 4
+  const MAX_COL_W = 200
+  const ROW_H = 60
+  const GRID_FONT = "bold 17px Arial, sans-serif"
 
-  ctx.fillStyle = "#333"
-  ctx.font = "12px Arial, sans-serif"
-  ctx.fillText(opts.eventVenue, W / 2, y)
-  y += 22
-
+  // Vertical divider spanning all 3 rows
+  ctx.save()
   ctx.strokeStyle = "#00000025"
-  ctx.lineWidth = 1
+  ctx.lineWidth = 1.5
   ctx.beginPath()
-  ctx.moveTo(QR_BOX_X + 10, y)
-  ctx.lineTo(QR_BOX_X + QR_BOX_W - 10, y)
+  ctx.moveTo(W / 2, y - 12)
+  ctx.lineTo(W / 2, y + ROW_H * 3 - 16)
   ctx.stroke()
-  y += 20
+  ctx.restore()
 
-  ctx.fillStyle = GREEN
-  ctx.font = "bold 9px Arial, sans-serif"
-  ctx.fillText("REGISTERED PARTICIPANT", W / 2, y)
-  y += 20
+  ctx.font = GRID_FONT
+  ctx.fillStyle = "#111"
 
-  ctx.fillStyle = "#000"
-  ctx.font = "bold 19px Arial, sans-serif"
-  ctx.fillText(opts.participantName, W / 2, y)
-  y += 30
+  const cap10 = (s: string) => s.length > 10 ? s.slice(0, 10) + "..." : s
 
-  ctx.fillStyle = "#333"
-  ctx.font = "12px Arial, sans-serif"
-  ctx.fillText(
-    `${opts.numberOfParticipants} ADMIT${opts.numberOfParticipants !== 1 ? "S" : ""}`,
-    W / 2,
-    y
-  )
+  // Row 1: Name | Event
+  ctx.fillText(`Name : ${cap10(opts.participantName)}`, COL_L, y)
+  ctx.fillText(`Event : ${cap10(opts.eventName)}`, COL_R, y)
+  y += ROW_H
+
+  // Row 2: Admits | Venue
+  const venueVal = truncateText(ctx, opts.eventVenue, MAX_COL_W, GRID_FONT)
+  const admitsStr = `${opts.numberOfParticipants} member${opts.numberOfParticipants !== 1 ? "s" : ""}`
+  ctx.fillText(`Admits :  ${admitsStr}`, COL_L, y)
+  ctx.fillText(`Venue :  ${venueVal}`, COL_R, y)
+  y += ROW_H
+
+  // Row 3: Date
+  ctx.fillText(`Date : ${opts.eventDate}`, COL_L, y)
 
   // ── White QR box ──────────────────────────────────────────────
   ctx.fillStyle = "#fff"
@@ -300,8 +287,8 @@ async function generateTicketCanvas(
 
   ctx.fillStyle = "#000"
   ctx.font = "bold 13px Arial, sans-serif"
-  ctx.fillText("Phone: 9446266011", W / 2, FOOTER_Y + 24)
-  ctx.fillText("Instagram: @ulsaham_", W / 2, FOOTER_Y + 50)
+  ctx.fillText("Contact : 9446266011", W / 2, FOOTER_Y + 24)
+  ctx.fillText("Instagram : @ulsaham_", W / 2, FOOTER_Y + 50)
 
   return canvas
 }
