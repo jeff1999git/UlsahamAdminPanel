@@ -51,6 +51,12 @@
   }
 }
 
+/* Grey placeholder text across all form fields */
+::placeholder {
+  color: hsl(0, 0%, 45%) !important;
+  opacity: 1;
+}
+
 /* Override browser autofill white background */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
