@@ -17,20 +17,23 @@ export async function listActivityLogs(params: ActivityLogListParams = {}) {
     limit = LOGS_PAGE_SIZE,
     action,
     adminUsername,
-    dateFrom,
     dateTo,
   } = params
+
+  // Default window: last 30 days (hard limit — older records are pruned anyway)
+  const dateFrom = params.dateFrom ?? (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 30)
+    return d
+  })()
 
   const where: Prisma.ActivityLogWhereInput = {}
 
   if (action) where.action = action as LogAction
   if (adminUsername) where.adminUsername = { contains: adminUsername, mode: "insensitive" }
 
-  if (dateFrom || dateTo) {
-    where.createdAt = {}
-    if (dateFrom) where.createdAt.gte = dateFrom
-    if (dateTo) where.createdAt.lte = dateTo
-  }
+  where.createdAt = { gte: dateFrom }
+  if (dateTo) (where.createdAt as Prisma.DateTimeFilter).lte = dateTo
 
   const [logs, total] = await Promise.all([
     prisma.activityLog.findMany({
@@ -45,9 +48,20 @@ export async function listActivityLogs(params: ActivityLogListParams = {}) {
   return { logs, total, page, totalPages: Math.ceil(total / limit) }
 }
 
-export async function getRecentActivityLogs(limit = 10) {
+export async function getRecentActivityLogs(limit = 10, days = 15) {
+  const since = new Date()
+  since.setDate(since.getDate() - days)
   return prisma.activityLog.findMany({
+    where: { createdAt: { gte: since } },
     orderBy: { createdAt: "desc" },
     take: limit,
+  })
+}
+
+export async function pruneOldActivityLogs() {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 30)
+  return prisma.activityLog.deleteMany({
+    where: { createdAt: { lt: cutoff } },
   })
 }

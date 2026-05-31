@@ -120,7 +120,7 @@ export function CreateAdminDialog() {
                 onChange={(e) => setShowPassword(e.target.checked)}
                 className="rounded"
               />
-              <label htmlFor="show-pw" className="cursor-pointer text-muted-foreground">
+              <label htmlFor="show-pw" className="cursor-pointer text-black">
                 Show passwords
               </label>
             </div>

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDateTime } from "@/lib/utils"
 import { LOG_ACTION_LABELS } from "@/constants"
@@ -29,16 +29,13 @@ const actionVariantMap: Record<string, "default" | "secondary" | "destructive" |
 export function ActivityFeed({ logs }: ActivityFeedProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-semibold text-gray-900">Recent Activity</CardTitle>
-      </CardHeader>
       <CardContent className="p-0">
         {logs.length === 0 ? (
-          <div className="px-6 py-8 text-center text-sm text-gray-500">
+          <div className="px-6 py-8 text-center text-sm text-black">
             No activity yet.
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100" aria-label="Recent activity feed">
+          <ul className="divide-y divide-border" aria-label="Recent activity feed">
             {logs.map((log) => (
               <li key={log.id} className="px-6 py-3 flex items-start gap-3">
                 <div className="flex-1 min-w-0">
@@ -46,12 +43,12 @@ export function ActivityFeed({ logs }: ActivityFeedProps) {
                     <Badge variant={actionVariantMap[log.action] ?? "muted"} className="text-xs">
                       {LOG_ACTION_LABELS[log.action] ?? log.action}
                     </Badge>
-                    <span className="text-xs text-gray-400 font-medium">
+                    <span className="text-xs text-black font-medium">
                       {log.adminUsername}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 mt-0.5 truncate">{log.description}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm text-black mt-0.5 truncate">{log.description}</p>
+                  <p className="text-xs text-black mt-0.5">
                     <time dateTime={log.createdAt.toISOString()}>
                       {formatDateTime(log.createdAt)}
                     </time>

@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Dashboard" }
 async function DashboardContent() {
   const [stats, recentLogs] = await Promise.all([
     getDashboardStats(),
-    getRecentActivityLogs(10),
+    getRecentActivityLogs(20, 15),
   ])
 
   return (
@@ -40,28 +40,28 @@ async function DashboardContent() {
           value={stats.publishedEvents}
           icon={CalendarCheck}
           description="Live events"
-          iconClassName="bg-green-100"
+          iconClassName="bg-[#014421]/10"
         />
         <StatsCard
           title="Upcoming"
           value={stats.upcomingEvents}
           icon={TrendingUp}
           description="Future events"
-          iconClassName="bg-blue-100"
+          iconClassName="bg-[#014421]/10"
         />
         <StatsCard
           title="Participants"
           value={stats.totalParticipants.toLocaleString("en-IN")}
           icon={Users}
           description="Total registered"
-          iconClassName="bg-purple-100"
+          iconClassName="bg-[#014421]/10"
         />
         <StatsCard
           title="Revenue"
           value={formatCurrency(stats.totalRevenue)}
           icon={DollarSign}
           description="From paid events"
-          iconClassName="bg-yellow-100"
+          iconClassName="bg-[#014421]/10"
         />
       </div>
 
@@ -82,7 +82,8 @@ async function DashboardContent() {
       </div>
 
       {/* Activity Feed */}
-      <div className="max-w-2xl">
+      <div className="max-w-2xl space-y-3">
+        <h2 className="text-lg font-semibold text-black">Recent Activity</h2>
         <ActivityFeed logs={recentLogs} />
       </div>
     </div>

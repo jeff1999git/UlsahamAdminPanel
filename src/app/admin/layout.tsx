@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const role = (session.user as { role?: AdminRole }).role ?? "ADMIN"
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Sidebar username={username} role={role} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">

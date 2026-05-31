@@ -5,7 +5,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Loader2, Zap } from "lucide-react"
+import { Loader2 } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -57,14 +58,17 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#014421] flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-14 h-14 bg-[#FEE715] rounded-2xl flex items-center justify-center shadow-lg">
-            <Zap className="h-8 w-8 text-[#014421]" />
-          </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">{APP_NAME}</h1>
-            <p className="text-white/70 text-sm">Admin Panel</p>
-          </div>
+        <div className="flex flex-col items-center gap-4">
+          <Image
+            src="/brand_logo.avif"
+            alt={APP_NAME}
+            width={220}
+            height={110}
+            style={{ height: "auto" }}
+            className="rounded-2xl shadow-lg"
+            priority
+          />
+          <p className="text-white/70 text-sm">Admin Panel</p>
         </div>
 
         <Card className="border-0 shadow-2xl">

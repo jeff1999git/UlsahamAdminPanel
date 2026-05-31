@@ -4,6 +4,7 @@ import {
   UserCog,
   Settings,
   ScrollText,
+  QrCode,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -13,6 +14,7 @@ export interface NavItem {
   icon: LucideIcon
   badge?: string
   superAdminOnly?: boolean
+  headerOnly?: boolean
 }
 
 export const adminNavItems: NavItem[] = [
@@ -27,15 +29,22 @@ export const adminNavItems: NavItem[] = [
     icon: CalendarDays,
   },
   {
+    label: "QR Scanner",
+    href: "/admin/scan",
+    icon: QrCode,
+  },
+  {
     label: "Admin Accounts",
     href: "/admin/admins",
     icon: UserCog,
     superAdminOnly: true,
+    headerOnly: true,
   },
   {
     label: "Settings",
     href: "/admin/settings",
     icon: Settings,
+    headerOnly: true,
   },
   {
     label: "Activity Logs",

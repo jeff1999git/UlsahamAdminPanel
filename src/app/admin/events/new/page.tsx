@@ -16,8 +16,8 @@ export default function NewEventPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Event</h1>
-          <p className="text-sm text-gray-500">Fill in the details to create a new event</p>
+          <h1 className="text-2xl font-bold text-black">Create Event</h1>
+          <p className="text-sm text-black">Fill in the details to create a new event</p>
         </div>
       </div>
       <EventForm />

@@ -1,8 +1,19 @@
 "use client"
 
-import { Zap } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { UserCog, Settings, LogOut } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { adminNavItems } from "@/config/nav"
+import { logoutAction } from "@/actions/auth.actions"
 
 interface HeaderProps {
   username?: string
@@ -21,38 +32,84 @@ export function Header({ username, role }: HeaderProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
 
+  const isSuperAdmin = role === "SUPER_ADMIN"
+
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+    <header className="sticky top-0 z-30 bg-background border-b border-black px-4 sm:px-6 py-4">
       <div className="flex items-center justify-between">
         {/* Mobile logo */}
-        <div className="flex items-center gap-3 lg:hidden">
-          <div className="w-7 h-7 bg-[#014421] rounded-lg flex items-center justify-center">
-            <Zap className="h-4 w-4 text-[#FEE715]" />
-          </div>
-          <span className="font-bold text-sm text-[#014421]">Ulsaham</span>
+        <div className="lg:hidden bg-[#014421] rounded-xl px-2 py-1">
+          <Image
+            src="/brand_logo.avif"
+            alt="Ulsaham Entertainments"
+            width={110}
+            height={55}
+            style={{ height: "auto" }}
+            priority
+          />
         </div>
 
         {/* Page title */}
-        <h1 className="hidden lg:block text-xl font-bold text-gray-900">{title}</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-black">{title}</h1>
 
-        {/* User info */}
+        {/* Profile dropdown */}
         {username && (
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-gray-900">{username}</p>
-              <p className="text-xs text-gray-500">
-                {role === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
-              </p>
-            </div>
-            <div
-              className="w-8 h-8 bg-[#014421] rounded-full flex items-center justify-center"
-              aria-hidden="true"
-            >
-              <span className="text-sm font-bold text-white">
-                {username[0]?.toUpperCase()}
-              </span>
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-3 rounded-lg hover:bg-black/5 px-2 py-1 transition-colors focus:outline-none">
+                <div className="hidden sm:block text-right">
+                  <p className="text-sm font-medium text-black">{username}</p>
+                  <p className="text-xs text-black">
+                    {isSuperAdmin ? "Super Admin" : "Admin"}
+                  </p>
+                </div>
+                <div className="w-9 h-9 bg-[#014421] rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-white">
+                    {username[0]?.toUpperCase()}
+                  </span>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="font-normal">
+                <p className="font-semibold text-black">{username}</p>
+                <p className="text-xs text-black/60">{isSuperAdmin ? "Super Admin" : "Admin"}</p>
+              </DropdownMenuLabel>
+
+              <DropdownMenuSeparator />
+
+              {isSuperAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/admins" className="flex items-center gap-2 cursor-pointer">
+                    <UserCog className="h-4 w-4" />
+                    Admin Accounts
+                  </Link>
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer">
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem asChild>
+                <form action={logoutAction} className="w-full">
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 w-full text-red-600 focus:text-red-600"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </form>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </header>

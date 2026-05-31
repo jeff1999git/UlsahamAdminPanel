@@ -8,8 +8,10 @@ import {
   updateExistingParticipant,
   deleteParticipantWithCleanup,
   toggleAttendance,
+  toggleAmountPaid,
   getAllParticipants,
   getParticipants,
+  scanGlobal,
 } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
 import type { ActionResult } from "@/types"
@@ -162,6 +164,34 @@ export async function toggleAttendanceAction(
   }
 }
 
+export async function toggleAmountPaidAction(
+  id: string,
+  eventId: string,
+  amountPaid: boolean
+): Promise<ActionResult<Participant>> {
+  const session = await getSession()
+
+  try {
+    const participant = await toggleAmountPaid(id, amountPaid)
+
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "PARTICIPANT_UPDATED",
+      entity: "Participant",
+      entityId: id,
+      description: `${amountPaid ? "Marked" : "Unmarked"} payment for ${participant.name}`,
+      metadata: { eventId },
+    })
+
+    revalidatePath(`/admin/events/${eventId}/participants`)
+    return { success: true, data: participant }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to update payment status"
+    return { success: false, error: msg }
+  }
+}
+
 export async function scanAttendanceAction(
   ticketCode: string,
   eventId: string
@@ -196,6 +226,71 @@ export async function scanAttendanceAction(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to mark attendance"
+    return { success: false, error: msg }
+  }
+}
+
+export async function scanGlobalAttendanceAction(
+  ticketCode: string
+): Promise<
+  ActionResult<{
+    participantName: string
+    phone: string
+    email: string | null
+    age: number | null
+    numberOfParticipants: number
+    ticketCode: string
+    alreadyAttended: boolean
+    eventName: string
+    eventDate: string
+    eventVenue: string
+    eventId: string
+  }>
+> {
+  const session = await getSession()
+
+  try {
+    const { found, alreadyAttended, participant } = await scanGlobal(ticketCode)
+
+    if (!found || !participant) {
+      return { success: false, error: "Invalid ticket code" }
+    }
+
+    if (!alreadyAttended) {
+      await logActivity({
+        adminUsername: session.username,
+        adminRole: session.role,
+        action: "ATTENDANCE_MARKED",
+        entity: "Participant",
+        entityId: participant.id,
+        description: `Scanned attendance for ${participant.name} (${ticketCode})`,
+        metadata: { eventId: participant.event.id, ticketCode },
+      })
+      revalidatePath(`/admin/events/${participant.event.id}/participants`)
+    }
+
+    return {
+      success: true,
+      data: {
+        participantName: participant.name,
+        phone: participant.phone,
+        email: participant.email,
+        age: participant.age,
+        numberOfParticipants: participant.numberOfParticipants,
+        ticketCode: participant.ticketCode,
+        alreadyAttended,
+        eventName: participant.event.name,
+        eventDate: new Date(participant.event.date).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+        eventVenue: participant.event.venue,
+        eventId: participant.event.id,
+      },
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to process scan"
     return { success: false, error: msg }
   }
 }

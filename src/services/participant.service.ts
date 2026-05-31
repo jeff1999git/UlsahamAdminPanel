@@ -9,6 +9,7 @@ import {
   deleteParticipant,
   countParticipantsForEvent,
   markAttendance,
+  markAttendanceByCode,
 } from "@/repositories/participant.repository"
 import { findEventById } from "@/repositories/event.repository"
 import { generateAndUploadQRCode } from "@/services/qr.service"
@@ -104,10 +105,18 @@ export async function toggleAttendance(id: string, attended: boolean) {
   })
 }
 
+export async function toggleAmountPaid(id: string, amountPaid: boolean) {
+  return updateParticipant(id, { amountPaid })
+}
+
 export async function scanAndMarkAttendance(ticketCode: string, eventId: string) {
   return markAttendance(ticketCode, eventId)
 }
 
 export async function checkTicketCode(ticketCode: string) {
   return findParticipantByTicketCode(ticketCode)
+}
+
+export async function scanGlobal(ticketCode: string) {
+  return markAttendanceByCode(ticketCode)
 }
