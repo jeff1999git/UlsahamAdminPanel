@@ -25,10 +25,12 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { ResetPasswordDialog } from "@/components/admin/reset-password-dialog"
 import { toggleAdminActiveAction, deleteAdminAction } from "@/actions/admin.actions"
 import { formatDate } from "@/lib/utils"
+import type { AdminRole } from "@prisma/client"
 
 interface AdminRow {
   id: string
   username: string
+  role: AdminRole
   isActive: boolean
   lastLoginAt: Date | null
   createdAt: Date
@@ -38,6 +40,13 @@ interface AdminTableProps {
   admins: AdminRow[]
 }
 
+function RoleBadge({ role }: { role: AdminRole }) {
+  if (role === "USER") {
+    return <Badge variant="secondary" className="text-xs">User</Badge>
+  }
+  return <Badge variant="outline" className="text-xs border-[#014421] text-[#014421]">Admin</Badge>
+}
+
 export function AdminTable({ admins }: AdminTableProps) {
   const [pending, startTransition] = useTransition()
 
@@ -45,7 +54,7 @@ export function AdminTable({ admins }: AdminTableProps) {
     startTransition(async () => {
       const result = await toggleAdminActiveAction(adminId, isActive)
       if (result.success) {
-        toast.success(isActive ? "Admin activated" : "Admin deactivated")
+        toast.success(isActive ? "Account activated" : "Account deactivated")
       } else {
         toast.error(result.error)
       }
@@ -56,7 +65,7 @@ export function AdminTable({ admins }: AdminTableProps) {
     startTransition(async () => {
       const result = await deleteAdminAction(adminId)
       if (result.success) {
-        toast.success("Admin account deleted")
+        toast.success("Account deleted")
       } else {
         toast.error(result.error)
       }
@@ -66,7 +75,7 @@ export function AdminTable({ admins }: AdminTableProps) {
   if (admins.length === 0) {
     return (
       <div className="text-center py-12 text-black">
-        No admin accounts yet. Create one using the button above.
+        No accounts yet. Create one using the button above.
       </div>
     )
   }
@@ -77,6 +86,7 @@ export function AdminTable({ admins }: AdminTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Username</TableHead>
+            <TableHead>Role</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Login</TableHead>
             <TableHead>Created</TableHead>
@@ -87,6 +97,9 @@ export function AdminTable({ admins }: AdminTableProps) {
           {admins.map((admin) => (
             <TableRow key={admin.id}>
               <TableCell className="font-medium">{admin.username}</TableCell>
+              <TableCell>
+                <RoleBadge role={admin.role} />
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <Switch
@@ -109,7 +122,7 @@ export function AdminTable({ admins }: AdminTableProps) {
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Admin actions">
+                    <Button variant="ghost" size="icon" aria-label="Account actions">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -118,7 +131,7 @@ export function AdminTable({ admins }: AdminTableProps) {
                     <DropdownMenuSeparator />
                     <ConfirmDialog
                       title={`Delete "${admin.username}"?`}
-                      description="This action cannot be undone. The admin account will be permanently deleted."
+                      description="This action cannot be undone. The account will be permanently deleted."
                       confirmLabel="Delete"
                       variant="destructive"
                       onConfirm={() => handleDelete(admin.id)}

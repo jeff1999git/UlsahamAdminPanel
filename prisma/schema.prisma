@@ -21,28 +21,29 @@ model Admin {
 enum AdminRole {
   SUPER_ADMIN
   ADMIN
+  USER
 }
 
 model Event {
-  id             String      @id @default(auto()) @map("_id") @db.ObjectId
-  name           String
-  slug           String      @unique
-  description    String
-  bannerImageUrl String
-  bannerImageId  String
-  venue          String
-  date           DateTime
-  startTime      String
-  endTime        String
-  isFree         Boolean     @default(true)
-  amount         Float?
-  status         EventStatus @default(DRAFT)
-  capacity                Int?
-  featured                Boolean     @default(false)
-  archivedParticipantCount Int        @default(0)
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  participants            Participant[]
+  id                       String        @id @default(auto()) @map("_id") @db.ObjectId
+  name                     String
+  slug                     String        @unique
+  description              String
+  bannerImageUrl           String
+  bannerImageId            String
+  venue                    String
+  date                     DateTime
+  startTime                String
+  endTime                  String
+  isFree                   Boolean       @default(true)
+  amount                   Float?
+  status                   EventStatus   @default(DRAFT)
+  capacity                 Int?
+  featured                 Boolean       @default(false)
+  archivedParticipantCount Int           @default(0)
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  participants             Participant[]
 
   @@index([date])
   @@index([status])
@@ -124,4 +125,7 @@ enum LogAction {
   ADMIN_CREATED
   ADMIN_UPDATED
   ADMIN_DELETED
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
 }

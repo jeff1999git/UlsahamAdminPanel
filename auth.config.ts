@@ -1,5 +1,14 @@
 import type { NextAuthConfig } from "next-auth"
 
+const USER_RESTRICTED = ["/admin/dashboard", "/admin/scan", "/admin/logs", "/admin/settings", "/admin/admins", "/admin/events/new"]
+
+function isUserRestrictedPath(pathname: string) {
+  if (USER_RESTRICTED.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true
+  // Block /admin/events/[id]/edit
+  if (/^\/admin\/events\/[^/]+\/edit(\/|$)/.test(pathname)) return true
+  return false
+}
+
 export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/login",
@@ -7,7 +16,7 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {
@@ -21,15 +30,25 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
+      const role = (auth?.user as { role?: string })?.role
       const isAdminRoute = nextUrl.pathname.startsWith("/admin")
       const isLoginRoute = nextUrl.pathname === "/login" || nextUrl.pathname === "/"
 
       if (isAdminRoute) {
-        return isLoggedIn
+        if (!isLoggedIn) return Response.redirect(new URL("/login", nextUrl))
+
+        // USER role cannot access restricted pages
+        if (role === "USER" && isUserRestrictedPath(nextUrl.pathname)) {
+          return Response.redirect(new URL("/admin/events", nextUrl))
+        }
+
+        return true
       }
 
       if (isLoginRoute && isLoggedIn) {
-        return Response.redirect(new URL("/admin/dashboard", nextUrl))
+        return Response.redirect(
+          new URL(role === "USER" ? "/admin/events" : "/admin/dashboard", nextUrl)
+        )
       }
 
       return true
@@ -37,7 +56,7 @@ export const authConfig: NextAuthConfig = {
     jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.role = (user as { role: string }).role
+        token.role = user.role
         token.username = user.name as string
       }
       return token
@@ -45,8 +64,8 @@ export const authConfig: NextAuthConfig = {
     session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
-        ;(session.user as { role: string }).role = token.role as string
-        ;(session.user as { username: string }).username = token.username as string
+        session.user.role = token.role as import("@prisma/client").AdminRole
+        session.user.username = token.username as string
       }
       return session
     },

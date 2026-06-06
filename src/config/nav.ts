@@ -14,6 +14,7 @@ export interface NavItem {
   icon: LucideIcon
   badge?: string
   superAdminOnly?: boolean
+  adminOnly?: boolean
   headerOnly?: boolean
 }
 
@@ -22,6 +23,7 @@ export const adminNavItems: NavItem[] = [
     label: "Dashboard",
     href: "/admin/dashboard",
     icon: LayoutDashboard,
+    adminOnly: true,
   },
   {
     label: "Events",
@@ -32,6 +34,7 @@ export const adminNavItems: NavItem[] = [
     label: "QR Scanner",
     href: "/admin/scan",
     icon: QrCode,
+    adminOnly: true,
   },
   {
     label: "Admin Accounts",
@@ -44,11 +47,13 @@ export const adminNavItems: NavItem[] = [
     label: "Settings",
     href: "/admin/settings",
     icon: Settings,
+    adminOnly: true,
     headerOnly: true,
   },
   {
     label: "Activity Logs",
     href: "/admin/logs",
     icon: ScrollText,
+    adminOnly: true,
   },
 ]

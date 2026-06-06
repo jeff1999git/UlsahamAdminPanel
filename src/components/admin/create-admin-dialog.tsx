@@ -31,7 +31,7 @@ export function CreateAdminDialog() {
 
   const form = useForm<CreateAdminFormValues>({
     resolver: zodResolver(createAdminSchema),
-    defaultValues: { username: "", password: "", confirmPassword: "" },
+    defaultValues: { username: "", password: "", confirmPassword: "", role: "ADMIN" },
   })
 
   async function onSubmit(values: CreateAdminFormValues) {
@@ -39,11 +39,12 @@ export function CreateAdminDialog() {
     fd.append("username", values.username)
     fd.append("password", values.password)
     fd.append("confirmPassword", values.confirmPassword)
+    fd.append("role", values.role)
 
     const result = await createAdminAction(fd)
 
     if (result.success) {
-      toast.success(`Admin "${result.data.username}" created successfully`)
+      toast.success(`Account "${result.data.username}" created`)
       form.reset()
       setOpen(false)
     } else {
@@ -56,15 +57,53 @@ export function CreateAdminDialog() {
       <DialogTrigger asChild>
         <Button>
           <UserPlus className="h-4 w-4 mr-2" />
-          Add Admin
+          Add Account
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Admin Account</DialogTitle>
+          <DialogTitle>Create Account</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Role selector */}
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Account Type</FormLabel>
+                  <FormControl>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["ADMIN", "USER"] as const).map((r) => (
+                        <label
+                          key={r}
+                          className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer text-sm font-medium transition-colors ${
+                            field.value === r
+                              ? "border-[#014421] bg-[#014421]/5 text-[#014421]"
+                              : "border-black/20 text-black/60 hover:border-black/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            value={r}
+                            checked={field.value === r}
+                            onChange={() => field.onChange(r)}
+                            className="sr-only"
+                          />
+                          <span>{r === "ADMIN" ? "Admin" : "User"}</span>
+                          <span className="text-xs font-normal text-black/40 ml-auto">
+                            {r === "ADMIN" ? "Full access" : "Events only"}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="username"
@@ -72,7 +111,7 @@ export function CreateAdminDialog() {
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. admin_kerala" {...field} />
+                    <Input placeholder="e.g. john_tester" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -129,7 +168,7 @@ export function CreateAdminDialog() {
                 Cancel
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Creating..." : "Create Admin"}
+                {form.formState.isSubmitting ? "Creating..." : "Create Account"}
               </Button>
             </div>
           </form>

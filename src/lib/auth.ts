@@ -25,26 +25,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const { username, password } = parsed.data
 
-        const admin = await prisma.admin.findUnique({
-          where: { username },
-        })
-
+        const admin = await prisma.admin.findUnique({ where: { username } })
         if (!admin || !admin.isActive) return null
 
-        const passwordMatch = await bcrypt.compare(password, admin.passwordHash)
-        if (!passwordMatch) return null
+        const match = await bcrypt.compare(password, admin.passwordHash)
+        if (!match) return null
 
-        await prisma.admin.update({
-          where: { id: admin.id },
-          data: { lastLoginAt: new Date() },
-        })
+        await prisma.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })
 
-        return {
-          id: admin.id,
-          name: admin.username,
-          email: null,
-          role: admin.role,
-        }
+        return { id: admin.id, name: admin.username, email: null, role: admin.role }
       },
     }),
   ],

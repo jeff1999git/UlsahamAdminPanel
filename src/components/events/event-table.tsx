@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import {
@@ -14,6 +14,8 @@ import {
   Calendar,
   MapPin,
   DollarSign,
+  UserPlus,
+  CheckCircle2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -36,6 +38,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EventStatusBadge } from "@/components/events/event-status-badge"
 import { TableEmpty } from "@/components/shared/data-table"
+import { EnrollDialog } from "@/components/participants/enroll-dialog"
 import { deleteEventAction, toggleEventStatusAction } from "@/actions/event.actions"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import type { EventWithParticipantCount } from "@/types/event.types"
@@ -46,12 +49,37 @@ function participantCount(event: EventWithParticipantCount): number {
 
 interface EventTableProps {
   events: EventWithParticipantCount[]
+  isUser?: boolean
 }
 
-export function EventTable({ events }: EventTableProps) {
+const ENROLL_STORAGE_KEY = "ulsaham_user_enrollments"
+
+export function EventTable({ events, isUser = false }: EventTableProps) {
   const [selected, setSelected] = useState<EventWithParticipantCount | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [enrollEvent, setEnrollEvent] = useState<EventWithParticipantCount | null>(null)
+  const [enrolledEventIds, setEnrolledEventIds] = useState<Set<string>>(new Set())
   const [, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (!isUser) return
+    try {
+      const stored = localStorage.getItem(ENROLL_STORAGE_KEY)
+      if (stored) setEnrolledEventIds(new Set(JSON.parse(stored) as string[]))
+    } catch {}
+  }, [isUser])
+
+  function handleEnrolled(eventId: string) {
+    setEnrolledEventIds((prev) => {
+      const next = new Set(prev)
+      next.add(eventId)
+      try {
+        localStorage.setItem(ENROLL_STORAGE_KEY, JSON.stringify([...next]))
+      } catch {}
+      return next
+    })
+    setEnrollEvent(null)
+  }
 
   function handleToggleStatus() {
     if (!selected) return
@@ -105,10 +133,20 @@ export function EventTable({ events }: EventTableProps) {
                   <p className="font-semibold text-black text-sm truncate">{event.name}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-black/60">{formatDate(event.date)}</span>
-                    <span className="text-xs text-black/40">·</span>
-                    <span className="text-xs text-black/60">
-                      {participantCount(event)} participant{participantCount(event) !== 1 ? "s" : ""}
-                    </span>
+                    {!isUser && (
+                      <>
+                        <span className="text-xs text-black/40">·</span>
+                        <span className="text-xs text-black/60">
+                          {participantCount(event)} participant{participantCount(event) !== 1 ? "s" : ""}
+                        </span>
+                      </>
+                    )}
+                    {isUser && enrolledEventIds.has(event.id) && (
+                      <span className="text-xs text-[#014421] font-medium flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Enrolled
+                      </span>
+                    )}
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-black/30 shrink-0" />
@@ -168,71 +206,114 @@ export function EventTable({ events }: EventTableProps) {
                     <span className="text-sm text-black">{formatCurrency(selected.amount ?? 0)}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <Users className="h-4 w-4 text-black/40 shrink-0" />
-                  <span className="text-sm text-black">
-                    {participantCount(selected)} registered
-                    {selected.capacity ? ` / ${selected.capacity} capacity` : ""}
-                  </span>
-                </div>
+                {!isUser && (
+                  <div className="flex items-center gap-2.5">
+                    <Users className="h-4 w-4 text-black/40 shrink-0" />
+                    <span className="text-sm text-black">
+                      {participantCount(selected)} registered
+                      {selected.capacity ? ` / ${selected.capacity} capacity` : ""}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
               <div className="border-t pt-4 space-y-2">
-                <div className="grid grid-cols-3 gap-2">
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/admin/events/${selected.id}/edit`}>
-                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                      Edit
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/admin/events/${selected.id}/participants`}>
-                      <Users className="h-3.5 w-3.5 mr-1.5" />
-                      Guests
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/admin/events/${selected.id}/scan`}>
-                      <QrCode className="h-3.5 w-3.5 mr-1.5" />
-                      Scan
-                    </Link>
-                  </Button>
+                <div className={`grid gap-2 ${isUser ? "grid-cols-1" : "grid-cols-3"}`}>
+                  {!isUser && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/admin/events/${selected.id}/edit`}>
+                        <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                        Edit
+                      </Link>
+                    </Button>
+                  )}
+                  {isUser ? (
+                    enrolledEventIds.has(selected.id) ? (
+                      <Button size="sm" variant="outline" disabled className="opacity-60 cursor-not-allowed">
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-[#014421]" />
+                        Enrolled
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-[#014421] text-[#014421] hover:bg-[#014421]/5"
+                        onClick={() => {
+                          setEnrollEvent(selected)
+                          setSelected(null)
+                        }}
+                      >
+                        <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                        Enroll
+                      </Button>
+                    )
+                  ) : (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/admin/events/${selected.id}/participants`}>
+                        <Users className="h-3.5 w-3.5 mr-1.5" />
+                        Guests
+                      </Link>
+                    </Button>
+                  )}
+                  {!isUser && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/admin/events/${selected.id}/scan`}>
+                        <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                        Scan
+                      </Link>
+                    </Button>
+                  )}
                 </div>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleToggleStatus}
-                >
-                  {selected.status === "PUBLISHED" ? (
-                    <>
-                      <EyeOff className="h-3.5 w-3.5 mr-2" />
-                      Unpublish
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-3.5 w-3.5 mr-2" />
-                      Publish
-                    </>
-                  )}
-                </Button>
+                {!isUser && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleToggleStatus}
+                    >
+                      {selected.status === "PUBLISHED" ? (
+                        <>
+                          <EyeOff className="h-3.5 w-3.5 mr-2" />
+                          Unpublish
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3.5 w-3.5 mr-2" />
+                          Publish
+                        </>
+                      )}
+                    </Button>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-2" />
-                  Delete Event
-                </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                      Delete Event
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </DialogContent>
         )}
       </Dialog>
+
+      {/* Enroll dialog for USER role */}
+      {isUser && (
+        <EnrollDialog
+          eventId={enrollEvent?.id ?? ""}
+          eventName={enrollEvent?.name ?? ""}
+          open={!!enrollEvent}
+          onOpenChange={(open) => { if (!open) setEnrollEvent(null) }}
+          onEnrolled={() => handleEnrolled(enrollEvent?.id ?? "")}
+        />
+      )}
 
       {/* Delete confirmation — separate portal, overlays the detail dialog */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>

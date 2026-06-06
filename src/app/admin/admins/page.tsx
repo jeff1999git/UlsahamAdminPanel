@@ -4,12 +4,12 @@ import { findAllAdmins } from "@/repositories/admin.repository"
 import { AdminTable } from "@/components/admin/admin-table"
 import { CreateAdminDialog } from "@/components/admin/create-admin-dialog"
 
-export const metadata = { title: "Admin Management" }
+export const metadata = { title: "Accounts" }
 
 export default async function AdminsPage() {
   const session = await auth()
 
-  if (session?.user?.role !== "SUPER_ADMIN") {
+  if ((session?.user as { role?: string })?.role !== "SUPER_ADMIN") {
     redirect("/admin/dashboard")
   }
 
@@ -19,9 +19,9 @@ export default async function AdminsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Admin Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
           <p className="text-black text-sm mt-1">
-            Create and manage admin accounts. Only you (Super Admin) can access this page.
+            Manage admin and user accounts. Admins have full access; users can only view events and participants.
           </p>
         </div>
         <CreateAdminDialog />

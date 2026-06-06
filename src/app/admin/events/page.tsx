@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth"
 import { Suspense } from "react"
 import Link from "next/link"
 import { Plus } from "lucide-react"
@@ -19,7 +20,7 @@ interface SearchParams {
   status?: string
 }
 
-async function EventsList({ searchParams }: { searchParams: SearchParams }) {
+async function EventsList({ searchParams, isUser }: { searchParams: SearchParams; isUser: boolean }) {
   const page = parseInt(searchParams.page ?? "1")
   const search = searchParams.search ?? ""
   const statusParam = searchParams.status ?? ""
@@ -42,7 +43,7 @@ async function EventsList({ searchParams }: { searchParams: SearchParams }) {
 
   return (
     <div className="space-y-4">
-      <EventTable events={events} />
+      <EventTable events={events} isUser={isUser} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-black">
           {total} event{total !== 1 ? "s" : ""} total
@@ -63,31 +64,33 @@ export default async function EventsPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  const session = await auth()
+  const isUser = (session?.user as { role?: string })?.role === "USER"
   const params = await searchParams
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-black">Events</h1>
           <p className="text-sm text-black mt-1">Manage your events</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/events/new">
-            <Plus className="h-4 w-4 mr-2" />
-            New Event
-          </Link>
-        </Button>
+        {!isUser && (
+          <Button asChild>
+            <Link href="/admin/events/new">
+              <Plus className="h-4 w-4 mr-2" />
+              New Event
+            </Link>
+          </Button>
+        )}
       </div>
 
-      {/* Filters */}
       <Suspense fallback={<div className="h-10" />}>
         <EventsFilter defaultSearch={params.search} defaultStatus={params.status} />
       </Suspense>
 
       <Suspense fallback={<TableSkeleton rows={5} cols={1} />}>
-        <EventsList searchParams={params} />
+        <EventsList searchParams={params} isUser={isUser} />
       </Suspense>
     </div>
   )
