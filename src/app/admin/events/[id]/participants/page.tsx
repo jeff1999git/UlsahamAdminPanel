@@ -21,7 +21,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ParticipantsPage({ params }: Props) {
   const session = await auth()
-  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+  const role = (session?.user as { role?: string })?.role
+  if (role === "USER") redirect("/admin/events")
 
   const { id } = await params
 
@@ -59,6 +60,7 @@ export default async function ParticipantsPage({ params }: Props) {
         eventDate={formatDate(event.date)}
         eventVenue={event.venue}
         eventBannerUrl={event.bannerImageUrl}
+        isSuperAdmin={role === "SUPER_ADMIN"}
       />
     </div>
   )

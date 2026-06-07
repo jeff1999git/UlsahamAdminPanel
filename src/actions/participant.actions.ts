@@ -176,7 +176,7 @@ export async function toggleAmountPaidAction(
   amountPaid: boolean
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   try {
     const participant = await toggleAmountPaid(id, amountPaid)

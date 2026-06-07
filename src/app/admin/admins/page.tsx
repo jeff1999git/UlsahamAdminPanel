@@ -24,7 +24,10 @@ export default async function AdminsPage() {
             Manage admin and user accounts. Admins have full access; users can only view events and participants.
           </p>
         </div>
-        <CreateAdminDialog />
+        <div className="flex items-center gap-2">
+          <CreateAdminDialog role="USER" />
+          <CreateAdminDialog role="ADMIN" />
+        </div>
       </div>
       <AdminTable admins={admins} />
     </div>
