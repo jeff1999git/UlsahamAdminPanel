@@ -45,6 +45,7 @@ export async function getPublishedEvents(params: {
   limit?: number
   featured?: boolean
   upcoming?: boolean
+  past?: boolean
 }) {
   await autoCompleteExpiredEvents()
   const result = await listPublishedEvents(params)

@@ -26,8 +26,9 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "10"), 1), 50)
     const featured = searchParams.get("featured") === "true" ? true : undefined
     const upcoming = searchParams.get("upcoming") === "true" ? true : undefined
+    const past = searchParams.get("past") === "true" ? true : undefined
 
-    const result = await getPublishedEvents({ page, limit, featured, upcoming })
+    const result = await getPublishedEvents({ page, limit, featured, upcoming, past })
 
     return NextResponse.json(
       {
