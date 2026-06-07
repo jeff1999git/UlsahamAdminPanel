@@ -32,12 +32,13 @@ model Event {
   bannerImageUrl           String
   bannerImageId            String
   venue                    String
+  venueLink                String?
   date                     DateTime
   startTime                String
   endTime                  String
   isFree                   Boolean       @default(true)
   amount                   Float?
-  status                   EventStatus   @default(DRAFT)
+  status                   EventStatus   @default(ANNOUNCED)
   capacity                 Int?
   featured                 Boolean       @default(false)
   archivedParticipantCount Int           @default(0)
@@ -50,7 +51,7 @@ model Event {
 }
 
 enum EventStatus {
-  DRAFT
+  ANNOUNCED
   PUBLISHED
   CANCELLED
   COMPLETED

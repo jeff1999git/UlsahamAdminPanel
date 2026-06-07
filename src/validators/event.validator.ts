@@ -21,6 +21,10 @@ const baseEventSchema = z.object({
     .string()
     .min(2, "Venue must be at least 2 characters")
     .max(500, "Venue must be at most 500 characters"),
+  venueLink: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().url("Must be a valid URL").optional().nullable()
+  ),
   date: z.coerce.date({ required_error: "Event date is required" }),
   startTime: z
     .string()
@@ -32,7 +36,7 @@ const baseEventSchema = z.object({
     .regex(/^\d{1,2}:\d{2}\s?(AM|PM)$/i, "Invalid time format"),
   isFree: z.boolean().default(true),
   amount: z.coerce.number().positive("Amount must be positive").optional().nullable(),
-  status: z.nativeEnum(EventStatus).default(EventStatus.DRAFT),
+  status: z.nativeEnum(EventStatus).default(EventStatus.ANNOUNCED),
   capacity: z.coerce.number().int().positive("Capacity must be a positive integer").optional().nullable(),
   featured: z.boolean().default(false),
 })

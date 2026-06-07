@@ -59,7 +59,7 @@ export function EventsFilter({ defaultSearch, defaultStatus }: EventsFilterProps
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Statuses</SelectItem>
-          <SelectItem value="DRAFT">Draft</SelectItem>
+          <SelectItem value="ANNOUNCED">Announced</SelectItem>
           <SelectItem value="PUBLISHED">Published</SelectItem>
           <SelectItem value="CANCELLED">Cancelled</SelectItem>
           <SelectItem value="COMPLETED">Completed</SelectItem>

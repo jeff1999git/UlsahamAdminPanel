@@ -12,7 +12,7 @@ export const MAX_PARTICIPANTS_PER_REGISTRATION = 10
 export const IST_TIMEZONE = "Asia/Kolkata"
 
 export const EVENT_STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Draft",
+  ANNOUNCED: "Announced",
   PUBLISHED: "Published",
   CANCELLED: "Cancelled",
   COMPLETED: "Completed",

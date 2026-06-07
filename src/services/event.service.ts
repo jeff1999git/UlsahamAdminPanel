@@ -75,6 +75,7 @@ export async function createNewEvent(input: CreateEventInput) {
     bannerImageUrl: input.bannerImageUrl,
     bannerImageId: input.bannerImageId,
     venue: sanitizeString(input.venue),
+    venueLink: input.venueLink ?? null,
     date: input.date,
     startTime: input.startTime,
     endTime: input.endTime,
@@ -96,6 +97,7 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.slug !== undefined) updateData.slug = input.slug
   if (input.description !== undefined) updateData.description = sanitizeString(input.description)
   if (input.venue !== undefined) updateData.venue = sanitizeString(input.venue)
+  if (input.venueLink !== undefined) updateData.venueLink = input.venueLink ?? null
   if (input.date !== undefined) updateData.date = input.date
   if (input.startTime !== undefined) updateData.startTime = input.startTime
   if (input.endTime !== undefined) updateData.endTime = input.endTime

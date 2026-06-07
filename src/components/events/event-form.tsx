@@ -69,12 +69,13 @@ export function EventForm({ event }: EventFormProps) {
       bannerImageUrl: event?.bannerImageUrl ?? "",
       bannerImageId: event?.bannerImageId ?? "",
       venue: event?.venue ?? "",
+      venueLink: event?.venueLink ?? "",
       date: event?.date ? new Date(event.date) : new Date(),
       startTime: event?.startTime ?? "10:00 AM",
       endTime: event?.endTime ?? "05:00 PM",
       isFree: event?.isFree ?? true,
       amount: event?.amount ?? undefined,
-      status: event?.status ?? "DRAFT",
+      status: event?.status ?? "ANNOUNCED",
       capacity: event?.capacity ?? undefined,
       featured: event?.featured ?? false,
     },
@@ -174,6 +175,25 @@ export function EventForm({ event }: EventFormProps) {
                       <FormControl>
                         <Input placeholder="Town Hall, Thrissur" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="venueLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location Link</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://maps.google.com/..."
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormDescription>Optional Google Maps or any location URL</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -368,7 +388,7 @@ export function EventForm({ event }: EventFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="DRAFT">Draft</SelectItem>
+                          <SelectItem value="ANNOUNCED">Announced</SelectItem>
                           <SelectItem value="PUBLISHED">Published</SelectItem>
                           <SelectItem value="CANCELLED">Cancelled</SelectItem>
                           <SelectItem value="COMPLETED">Completed</SelectItem>
