@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { MAX_PARTICIPANTS_PER_REGISTRATION } from "@/constants"
 
 export const participantSchema = z.object({
   name: z
@@ -23,7 +24,7 @@ export const participantSchema = z.object({
     .number()
     .int("Number of participants must be a whole number")
     .min(1, "At least 1 participant required")
-    .max(10, "Maximum 10 participants per registration"),
+    .max(MAX_PARTICIPANTS_PER_REGISTRATION, `Maximum ${MAX_PARTICIPANTS_PER_REGISTRATION} participants per registration`),
 })
 
 export const publicRegistrationSchema = participantSchema.extend({

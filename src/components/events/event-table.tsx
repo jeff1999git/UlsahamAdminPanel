@@ -309,6 +309,8 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
         <EnrollDialog
           eventId={enrollEvent?.id ?? ""}
           eventName={enrollEvent?.name ?? ""}
+          isFree={enrollEvent?.isFree ?? true}
+          amount={enrollEvent?.amount ?? null}
           open={!!enrollEvent}
           onOpenChange={(open) => { if (!open) setEnrollEvent(null) }}
           onEnrolled={() => handleEnrolled(enrollEvent?.id ?? "")}

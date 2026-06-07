@@ -35,6 +35,20 @@ export const checkTicketRateLimit = new Ratelimit({
   prefix: "ulsaham:check-ticket",
 })
 
+export const paymentOrderRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  analytics: true,
+  prefix: "ulsaham:payment-order",
+})
+
+export const myTicketsRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, "1 m"),
+  analytics: true,
+  prefix: "ulsaham:my-tickets",
+})
+
 export function getClientIP(request: Request): string {
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??

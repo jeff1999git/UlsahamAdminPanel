@@ -60,6 +60,7 @@ interface ParticipantTableProps {
   eventDate: string
   eventVenue: string
   eventBannerUrl?: string | null
+  isSuperAdmin: boolean
 }
 
 export function ParticipantTable({
@@ -70,6 +71,7 @@ export function ParticipantTable({
   eventDate,
   eventVenue,
   eventBannerUrl,
+  isSuperAdmin,
 }: ParticipantTableProps) {
   const [, startTransition] = useTransition()
   const [editParticipant, setEditParticipant] = useState<Participant | null>(null)
@@ -247,7 +249,7 @@ export function ParticipantTable({
                           ) : (
                             <span className="text-[9px] text-black/40 font-medium px-2">Unpaid</span>
                           )
-                        ) : (
+                        ) : isSuperAdmin ? (
                           <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#014421] border border-[#014421] cursor-pointer">
                             <Checkbox
                               checked={p.amountPaid ?? false}
@@ -257,6 +259,10 @@ export function ParticipantTable({
                             />
                             <span className="text-xs font-semibold text-white leading-none">Paid</span>
                           </label>
+                        ) : (
+                          p.amountPaid
+                            ? <span className="text-[9px] text-emerald-600 font-semibold px-2">Paid</span>
+                            : <span className="text-[9px] text-black/40 font-medium px-2">Unpaid</span>
                         )}
                       </div>
 
@@ -304,14 +310,20 @@ export function ParticipantTable({
                       {p.numberOfParticipants}
                     </TableCell>
                     <TableCell>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={p.amountPaid ?? false}
-                          onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
-                          aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
-                          className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                        />
-                      </div>
+                      {isSuperAdmin ? (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={p.amountPaid ?? false}
+                            onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
+                            aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
+                            className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                          />
+                        </div>
+                      ) : (
+                        p.amountPaid
+                          ? <Badge variant="success" className="text-xs">Paid</Badge>
+                          : <Badge variant="muted" className="text-xs">Unpaid</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {p.attended ? (

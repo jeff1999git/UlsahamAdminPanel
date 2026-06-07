@@ -111,10 +111,9 @@ export async function POST(
       { status: 201, headers: corsHeaders }
     )
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Registration failed"
     console.error("Registration error:", error)
     return NextResponse.json(
-      { success: false, error: msg },
+      { success: false, error: "Registration failed. Please try again." },
       { status: 500, headers: corsHeaders }
     )
   }

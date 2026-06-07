@@ -70,6 +70,7 @@ export async function registerParticipant(
     ticketCode,
     qrCodeUrl,
     qrCodeImageId,
+    ...(input.amountPaid !== undefined && { amountPaid: input.amountPaid }),
   })
 
   return { participant, isNew: true }
