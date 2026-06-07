@@ -18,8 +18,8 @@ export async function findEventBySlug(slug: string) {
 }
 
 export async function findPublishedEventBySlug(slug: string) {
-  return prisma.event.findUnique({
-    where: { slug, status: "PUBLISHED" },
+  return prisma.event.findFirst({
+    where: { slug, status: { in: ["PUBLISHED", "COMPLETED"] } },
     include: { _count: { select: { participants: true } } },
   })
 }
@@ -72,19 +72,24 @@ export async function listPublishedEvents(params: {
   limit?: number
   featured?: boolean
   upcoming?: boolean
+  past?: boolean
 }) {
-  const { page = 1, limit = 10, featured, upcoming } = params
+  const { page = 1, limit = 10, featured, upcoming, past } = params
 
-  const where: Prisma.EventWhereInput = { status: "PUBLISHED" }
+  const where: Prisma.EventWhereInput = past
+    ? { status: "COMPLETED" }
+    : { status: "PUBLISHED" }
 
-  if (featured === true) where.featured = true
-  if (upcoming === true) where.date = { gt: new Date() }
+  if (!past) {
+    if (featured === true) where.featured = true
+    if (upcoming === true) where.date = { gt: new Date() }
+  }
 
   const [events, total] = await Promise.all([
     prisma.event.findMany({
       where,
       include: { _count: { select: { participants: true } } },
-      orderBy: { date: "asc" },
+      orderBy: { date: past ? "desc" : "asc" },
       skip: (page - 1) * limit,
       take: limit,
     }),
