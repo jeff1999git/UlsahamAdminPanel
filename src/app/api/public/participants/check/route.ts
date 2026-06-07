@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const { success } = await checkTicketRateLimit.limit(ip)
   if (!success) {
     return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
+      { success: false, error: "Too many requests. Please try again later." },
       { status: 429, headers: corsHeaders }
     )
   }

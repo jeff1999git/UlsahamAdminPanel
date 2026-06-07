@@ -83,9 +83,9 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
 
   function handleToggleStatus() {
     if (!selected) return
-    const newStatus = selected.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED"
+    const newStatus = selected.status === "PUBLISHED" ? "ANNOUNCED" : "PUBLISHED"
     startTransition(async () => {
-      const result = await toggleEventStatusAction(selected.id, newStatus as "PUBLISHED" | "DRAFT")
+      const result = await toggleEventStatusAction(selected.id, newStatus as "PUBLISHED" | "ANNOUNCED")
       if (result.success) {
         toast.success(`Event ${newStatus === "PUBLISHED" ? "published" : "unpublished"}`)
         setSelected(null)

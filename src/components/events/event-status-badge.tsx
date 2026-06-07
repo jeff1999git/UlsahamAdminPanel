@@ -5,7 +5,7 @@ const statusConfig: Record<
   EventStatus,
   { label: string; variant: "default" | "secondary" | "destructive" | "success" | "warning" | "muted" }
 > = {
-  DRAFT: { label: "Draft", variant: "muted" },
+  ANNOUNCED: { label: "Announced", variant: "warning" },
   PUBLISHED: { label: "Published", variant: "success" },
   CANCELLED: { label: "Cancelled", variant: "destructive" },
   COMPLETED: { label: "Completed", variant: "secondary" },

@@ -52,14 +52,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function sanitizeString(input: string): string {
-  return input
-    .replace(/<[^>]*>/g, "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .trim()
+  return input.replace(/<[^>]*>/g, "").trim()
 }
 
 export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {

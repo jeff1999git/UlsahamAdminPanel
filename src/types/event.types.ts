@@ -16,6 +16,7 @@ export type PublicEvent = Pick<
   | "description"
   | "bannerImageUrl"
   | "venue"
+  | "venueLink"
   | "date"
   | "startTime"
   | "endTime"
@@ -35,6 +36,7 @@ export type CreateEventInput = {
   bannerImageUrl: string
   bannerImageId: string
   venue: string
+  venueLink?: string | null
   date: Date
   startTime: string
   endTime: string
