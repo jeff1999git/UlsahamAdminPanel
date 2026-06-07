@@ -51,7 +51,6 @@ export type PublicParticipantCheck = {
 
 export type RegistrationResult = {
   ticketCode: string
-  qrCodeUrl: string
   participantName: string
   eventName: string
   eventDate: Date

@@ -341,7 +341,6 @@ export function ParticipantTable({
                           <QRCodeModal
                             ticketCode={p.ticketCode}
                             participantName={p.name}
-                            qrCodeUrl={p.qrCodeUrl}
                             eventName={eventName}
                             eventDate={eventDate}
                             eventVenue={eventVenue}
