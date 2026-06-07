@@ -44,7 +44,7 @@ import { formatDate, formatCurrency } from "@/lib/utils"
 import type { EventWithParticipantCount } from "@/types/event.types"
 
 function participantCount(event: EventWithParticipantCount): number {
-  return event._count.participants || (event as unknown as { archivedParticipantCount: number }).archivedParticipantCount || 0
+  return event._count.participants || event.archivedParticipantCount || 0
 }
 
 interface EventTableProps {
@@ -268,24 +268,26 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
 
                 {!isUser && (
                   <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleToggleStatus}
-                    >
-                      {selected.status === "PUBLISHED" ? (
-                        <>
-                          <EyeOff className="h-3.5 w-3.5 mr-2" />
-                          Unpublish
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-3.5 w-3.5 mr-2" />
-                          Publish
-                        </>
-                      )}
-                    </Button>
+                    {selected.status !== "CANCELLED" && selected.status !== "COMPLETED" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleToggleStatus}
+                      >
+                        {selected.status === "PUBLISHED" ? (
+                          <>
+                            <EyeOff className="h-3.5 w-3.5 mr-2" />
+                            Unpublish
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3.5 w-3.5 mr-2" />
+                            Publish
+                          </>
+                        )}
+                      </Button>
+                    )}
 
                     <Button
                       size="sm"

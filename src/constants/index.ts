@@ -2,7 +2,6 @@ export const APP_NAME = "Ulsaham Entertainments"
 export const APP_DESCRIPTION = "Event Management Admin Panel"
 export const TICKET_CODE_PREFIX = "UE"
 export const CLOUDINARY_EVENTS_FOLDER = "ulsaham/events"
-export const CLOUDINARY_QRCODES_FOLDER = "ulsaham/qrcodes"
 export const MAX_IMAGE_SIZE_MB = 5
 export const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
@@ -34,4 +33,7 @@ export const LOG_ACTION_LABELS: Record<string, string> = {
   ADMIN_CREATED: "Admin Created",
   ADMIN_UPDATED: "Admin Updated",
   ADMIN_DELETED: "Admin Deleted",
+  USER_CREATED: "User Created",
+  USER_UPDATED: "User Updated",
+  USER_DELETED: "User Deleted",
 }
