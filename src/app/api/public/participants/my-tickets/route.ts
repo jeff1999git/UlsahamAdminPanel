@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
 
     const tickets = participants.map((p) => ({
       ticketCode: p.ticketCode,
-      qrCodeUrl: p.qrCodeUrl,
       participantName: p.name,
       numberOfParticipants: p.numberOfParticipants,
       amountPaid: p.amountPaid,

@@ -98,7 +98,6 @@ export async function POST(
         message: "Registration successful!",
         data: {
           ticketCode: participant.ticketCode,
-          qrCodeUrl: participant.qrCodeUrl,
           participantName: participant.name,
           eventName: event.name,
           eventDate: event.date,

@@ -15,9 +15,7 @@ import {
   addEnteredCount,
 } from "@/repositories/participant.repository"
 import { findEventById } from "@/repositories/event.repository"
-import { generateAndUploadQRCode } from "@/services/qr.service"
 import { generateTicketCode } from "@/lib/ticket-code"
-import { deleteImage } from "@/lib/cloudinary"
 import { sanitizeString } from "@/lib/utils"
 import type {
   CreateParticipantInput,
@@ -58,7 +56,6 @@ export async function registerParticipant(
   }
 
   const ticketCode = generateTicketCode(event.slug)
-  const { qrCodeUrl, qrCodeImageId } = await generateAndUploadQRCode(ticketCode)
 
   const participant = await createParticipant({
     event: { connect: { id: input.eventId } },
@@ -68,8 +65,6 @@ export async function registerParticipant(
     age: input.age,
     numberOfParticipants: input.numberOfParticipants,
     ticketCode,
-    qrCodeUrl,
-    qrCodeImageId,
     ...(input.amountPaid !== undefined && { amountPaid: input.amountPaid }),
   })
 
@@ -98,7 +93,6 @@ export async function deleteParticipantWithCleanup(id: string) {
   const participant = await findParticipantById(id)
   if (!participant) throw new Error("Participant not found")
 
-  await deleteImage(participant.qrCodeImageId)
   return deleteParticipant(id)
 }
 

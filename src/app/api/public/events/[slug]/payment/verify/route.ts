@@ -89,7 +89,6 @@ export async function POST(
           message: "Payment verified and registration confirmed!",
           data: {
             ticketCode: updated.ticketCode,
-            qrCodeUrl: updated.qrCodeUrl,
             participantName: updated.name,
             eventName: event.name,
             eventDate: event.date,
@@ -119,7 +118,6 @@ export async function POST(
         message: "Payment verified and registration confirmed!",
         data: {
           ticketCode: participant.ticketCode,
-          qrCodeUrl: participant.qrCodeUrl,
           participantName: participant.name,
           eventName: event.name,
           eventDate: event.date,

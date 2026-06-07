@@ -22,7 +22,6 @@ const QRCode = dynamic(() => import("react-qr-code"), {
 interface QRCodeModalProps {
   ticketCode: string
   participantName: string
-  qrCodeUrl: string
   eventName: string
   eventDate: string
   eventVenue: string
@@ -297,7 +296,6 @@ async function generateTicketCanvas(
 export function QRCodeModal({
   ticketCode,
   participantName,
-  qrCodeUrl: _qrCodeUrl,
   eventName,
   eventDate,
   eventVenue,
