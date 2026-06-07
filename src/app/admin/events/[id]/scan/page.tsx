@@ -1,6 +1,7 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+import { auth } from "@/lib/auth"
 import { findEventById } from "@/repositories/event.repository"
 import { QRScanner } from "@/components/participants/qr-scanner"
 import type { Metadata } from "next"
@@ -16,6 +17,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ScanPage({ params }: Props) {
+  const session = await auth()
+  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+
   const { id } = await params
   const event = await findEventById(id)
 

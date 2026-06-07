@@ -4,8 +4,8 @@ const USER_RESTRICTED = ["/admin/dashboard", "/admin/scan", "/admin/logs", "/adm
 
 function isUserRestrictedPath(pathname: string) {
   if (USER_RESTRICTED.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true
-  // Block /admin/events/[id]/edit
-  if (/^\/admin\/events\/[^/]+\/edit(\/|$)/.test(pathname)) return true
+  // Block /admin/events/[id]/edit, /participants, /scan
+  if (/^\/admin\/events\/[^/]+\/(edit|participants|scan)(\/|$)/.test(pathname)) return true
   return false
 }
 

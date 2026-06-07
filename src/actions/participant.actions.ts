@@ -12,6 +12,9 @@ import {
   getAllParticipants,
   getParticipants,
   scanGlobal,
+  scanForEntry,
+  scanForEntryGlobal,
+  markEntry,
 } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
 import type { ActionResult } from "@/types"
@@ -192,93 +195,140 @@ export async function toggleAmountPaidAction(
   }
 }
 
+export type ScanEntryData = {
+  participantId: string
+  ticketCode: string
+  name: string
+  numberOfParticipants: number
+  enteredCount: number
+  fullyEntered: boolean
+  remaining: number
+  needsCountInput: boolean
+}
+
 export async function scanAttendanceAction(
   ticketCode: string,
   eventId: string
-): Promise<ActionResult<{ name: string; alreadyAttended: boolean }>> {
-  const session = await getSession()
+): Promise<ActionResult<ScanEntryData>> {
+  await getSession()
 
   try {
-    const { found, alreadyAttended, participant } = await import(
-      "@/services/participant.service"
-    ).then((m) => m.scanAndMarkAttendance(ticketCode, eventId))
-
+    const { found, participant } = await scanForEntry(ticketCode, eventId)
     if (!found || !participant) {
       return { success: false, error: "Invalid ticket code for this event" }
     }
 
-    if (!alreadyAttended) {
-      await logActivity({
-        adminUsername: session.username,
-        adminRole: session.role,
-        action: "ATTENDANCE_MARKED",
-        entity: "Participant",
-        entityId: participant.id,
-        description: `Scanned attendance for ${participant.name} (${ticketCode})`,
-        metadata: { eventId, ticketCode },
-      })
-      revalidatePath(`/admin/events/${eventId}/participants`)
-    }
+    const isLegacyAttended = participant.attended && participant.enteredCount === 0
+    const fullyEntered = isLegacyAttended || participant.enteredCount >= participant.numberOfParticipants
+    const remaining = participant.numberOfParticipants - participant.enteredCount
+    const needsCountInput = !fullyEntered && participant.numberOfParticipants > 1
 
     return {
       success: true,
-      data: { name: participant.name, alreadyAttended },
+      data: {
+        participantId: participant.id,
+        ticketCode: participant.ticketCode,
+        name: participant.name,
+        numberOfParticipants: participant.numberOfParticipants,
+        enteredCount: participant.enteredCount,
+        fullyEntered,
+        remaining,
+        needsCountInput,
+      },
     }
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Failed to mark attendance"
+    const msg = error instanceof Error ? error.message : "Failed to scan ticket"
     return { success: false, error: msg }
   }
 }
 
-export async function scanGlobalAttendanceAction(
-  ticketCode: string
-): Promise<
-  ActionResult<{
-    participantName: string
-    phone: string
-    email: string | null
-    age: number | null
-    numberOfParticipants: number
-    ticketCode: string
-    alreadyAttended: boolean
-    eventName: string
-    eventDate: string
-    eventVenue: string
-    eventId: string
-  }>
-> {
+export async function confirmEntryAction(
+  participantId: string,
+  eventId: string,
+  count: number
+): Promise<ActionResult<{ name: string; enteredCount: number; numberOfParticipants: number; fullyEntered: boolean }>> {
   const session = await getSession()
 
   try {
-    const { found, alreadyAttended, participant } = await scanGlobal(ticketCode)
+    const updated = await markEntry(participantId, eventId, count)
+    const fullyEntered = updated.enteredCount >= updated.numberOfParticipants
+
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "ATTENDANCE_MARKED",
+      entity: "Participant",
+      entityId: updated.id,
+      description: `${count} member(s) entered for ${updated.name} (${updated.ticketCode}) — ${updated.enteredCount}/${updated.numberOfParticipants} total`,
+      metadata: { eventId, ticketCode: updated.ticketCode, count, enteredCount: updated.enteredCount },
+    })
+
+    revalidatePath(`/admin/events/${eventId}/participants`)
+
+    return {
+      success: true,
+      data: {
+        name: updated.name,
+        enteredCount: updated.enteredCount,
+        numberOfParticipants: updated.numberOfParticipants,
+        fullyEntered,
+      },
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to confirm entry"
+    return { success: false, error: msg }
+  }
+}
+
+export type GlobalScanData = {
+  participantId: string
+  participantName: string
+  phone: string
+  email: string | null
+  age: number | null
+  numberOfParticipants: number
+  enteredCount: number
+  ticketCode: string
+  fullyEntered: boolean
+  remaining: number
+  needsCountInput: boolean
+  eventName: string
+  eventDate: string
+  eventVenue: string
+  eventId: string
+}
+
+export async function scanGlobalAttendanceAction(
+  ticketCode: string
+): Promise<ActionResult<GlobalScanData>> {
+  await getSession()
+
+  try {
+    const { found, participant } = await scanForEntryGlobal(ticketCode)
 
     if (!found || !participant) {
       return { success: false, error: "Invalid ticket code" }
     }
 
-    if (!alreadyAttended) {
-      await logActivity({
-        adminUsername: session.username,
-        adminRole: session.role,
-        action: "ATTENDANCE_MARKED",
-        entity: "Participant",
-        entityId: participant.id,
-        description: `Scanned attendance for ${participant.name} (${ticketCode})`,
-        metadata: { eventId: participant.event.id, ticketCode },
-      })
-      revalidatePath(`/admin/events/${participant.event.id}/participants`)
-    }
+    const isLegacyAttended = participant.attended && participant.enteredCount === 0
+    const fullyEntered = isLegacyAttended || participant.enteredCount >= participant.numberOfParticipants
+    const remaining = participant.numberOfParticipants - participant.enteredCount
+    const needsCountInput = !fullyEntered && participant.numberOfParticipants > 1
 
     return {
       success: true,
       data: {
+        participantId: participant.id,
         participantName: participant.name,
         phone: participant.phone,
         email: participant.email,
         age: participant.age,
         numberOfParticipants: participant.numberOfParticipants,
+        enteredCount: participant.enteredCount,
         ticketCode: participant.ticketCode,
-        alreadyAttended,
+        fullyEntered,
+        remaining,
+        needsCountInput,
         eventName: participant.event.name,
         eventDate: new Date(participant.event.date).toLocaleDateString("en-IN", {
           day: "numeric",
@@ -291,6 +341,44 @@ export async function scanGlobalAttendanceAction(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to process scan"
+    return { success: false, error: msg }
+  }
+}
+
+export async function confirmGlobalEntryAction(
+  participantId: string,
+  eventId: string,
+  count: number
+): Promise<ActionResult<{ name: string; enteredCount: number; numberOfParticipants: number; fullyEntered: boolean }>> {
+  const session = await getSession()
+
+  try {
+    const updated = await markEntry(participantId, eventId, count)
+    const fullyEntered = updated.enteredCount >= updated.numberOfParticipants
+
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "ATTENDANCE_MARKED",
+      entity: "Participant",
+      entityId: updated.id,
+      description: `${count} member(s) entered for ${updated.name} (${updated.ticketCode}) — ${updated.enteredCount}/${updated.numberOfParticipants} total`,
+      metadata: { eventId, ticketCode: updated.ticketCode, count, enteredCount: updated.enteredCount },
+    })
+
+    revalidatePath(`/admin/events/${eventId}/participants`)
+
+    return {
+      success: true,
+      data: {
+        name: updated.name,
+        enteredCount: updated.enteredCount,
+        numberOfParticipants: updated.numberOfParticipants,
+        fullyEntered,
+      },
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to confirm entry"
     return { success: false, error: msg }
   }
 }

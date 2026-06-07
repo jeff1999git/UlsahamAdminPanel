@@ -71,6 +71,7 @@ model Participant {
   amountPaid           Boolean   @default(false)
   attended             Boolean   @default(false)
   attendedAt           DateTime?
+  enteredCount         Int       @default(0)
   registeredAt         DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
