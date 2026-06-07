@@ -94,6 +94,18 @@ export async function listPublishedEvents(params: {
   return { events, total, page, totalPages: Math.ceil(total / limit) }
 }
 
+export async function autoCompleteExpiredEvents() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return prisma.event.updateMany({
+    where: {
+      date: { lt: today },
+      status: { in: ["ANNOUNCED", "PUBLISHED"] },
+    },
+    data: { status: "COMPLETED" },
+  })
+}
+
 export async function createEvent(data: Prisma.EventCreateInput) {
   return prisma.event.create({ data })
 }

@@ -4,6 +4,7 @@ import {
   findPublishedEventBySlug,
   listEvents,
   listPublishedEvents,
+  autoCompleteExpiredEvents,
   createEvent,
   updateEvent,
   deleteEvent,
@@ -35,6 +36,7 @@ export async function getPublishedEventBySlug(slug: string) {
 }
 
 export async function getEvents(params: EventListParams) {
+  await autoCompleteExpiredEvents()
   return listEvents(params)
 }
 
@@ -44,6 +46,7 @@ export async function getPublishedEvents(params: {
   featured?: boolean
   upcoming?: boolean
 }) {
+  await autoCompleteExpiredEvents()
   const result = await listPublishedEvents(params)
 
   const eventsWithMeta = await Promise.all(
