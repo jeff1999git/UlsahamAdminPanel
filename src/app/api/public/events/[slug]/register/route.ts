@@ -5,7 +5,6 @@ import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug } from "@/services/event.service"
 import { countParticipantsForEvent, findParticipantByEventAndPhone } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
-import { z } from "zod"
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request)
@@ -62,9 +61,9 @@ export async function POST(
       )
     }
 
-    if (event.status === "CANCELLED" || event.status === "COMPLETED") {
+    if (!event.isFree) {
       return NextResponse.json(
-        { success: false, error: "Event is not accepting registrations" },
+        { success: false, error: "This is a paid event — use the payment endpoint" },
         { status: 400, headers: corsHeaders }
       )
     }

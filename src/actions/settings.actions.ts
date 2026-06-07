@@ -38,7 +38,6 @@ export async function updateSettingsAction(
   for (const [key, value] of Object.entries(parsed.data)) {
     cleanData[key] = value === "" ? null : (value as string | null) ?? null
   }
-  if (parsed.data.companyName) cleanData.companyName = parsed.data.companyName
 
   try {
     const settings = await upsertSettings(cleanData)

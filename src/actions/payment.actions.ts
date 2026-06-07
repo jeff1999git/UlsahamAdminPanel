@@ -70,6 +70,9 @@ export async function createPaymentOrderAction(
       }
     }
 
+    const keyId = process.env.RAZORPAY_KEY_ID
+    if (!keyId) return { success: false, error: "Payment gateway not configured" }
+
     const { total } = calculateTicketFees(event.amount, quantity)
     const totalAmountPaise = Math.round(total * 100)
 
@@ -87,9 +90,6 @@ export async function createPaymentOrderAction(
         numberOfParticipants: String(quantity),
       },
     })
-
-    const keyId = process.env.RAZORPAY_KEY_ID
-    if (!keyId) throw new Error("RAZORPAY_KEY_ID is not configured")
 
     return {
       success: true,
