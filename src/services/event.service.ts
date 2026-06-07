@@ -59,11 +59,18 @@ export async function getPublishedEvents(params: {
 }
 
 export async function createNewEvent(input: CreateEventInput) {
-  const slug = input.slug || generateSlug(input.name)
+  const baseSlug = input.slug || generateSlug(input.name)
+
+  // Try base slug, then append a short timestamp suffix on collision
+  let slug = baseSlug
+  const existing = await findEventBySlug(slug)
+  if (existing) {
+    slug = `${baseSlug}-${Date.now().toString(36).slice(-5)}`
+  }
 
   return createEvent({
     name: sanitizeString(input.name),
-    slug,
+    slug: slug,
     description: sanitizeString(input.description),
     bannerImageUrl: input.bannerImageUrl,
     bannerImageId: input.bannerImageId,

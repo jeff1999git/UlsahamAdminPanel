@@ -8,6 +8,7 @@ import { findEventById } from "@/repositories/event.repository"
 import {
   findParticipantByEventAndPhone,
   countParticipantsForEvent,
+  updateParticipant,
 } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
@@ -70,6 +71,9 @@ export async function createPaymentOrderAction(
         eventId,
         eventName: event.name,
         phone: parsed.data.phone,
+        name: parsed.data.name,
+        email: parsed.data.email ?? "",
+        age: String(parsed.data.age),
         numberOfParticipants: String(parsed.data.numberOfParticipants),
       },
     })
@@ -112,6 +116,16 @@ export async function verifyAndEnrollAction(
   if (!parsed.success) return { success: false, error: "Invalid form data" }
 
   try {
+    // Webhook may have already enrolled this participant — handle gracefully
+    const existing = await findParticipantByEventAndPhone(eventId, parsed.data.phone)
+    if (existing) {
+      if (!existing.amountPaid) {
+        await updateParticipant(existing.id, { amountPaid: true })
+      }
+      revalidatePath(`/admin/events/${eventId}/participants`)
+      return { success: true, data: existing }
+    }
+
     const { participant } = await registerParticipant({
       eventId,
       ...parsed.data,

@@ -25,6 +25,7 @@ export async function updateSettingsAction(
   formData: Record<string, unknown>
 ): Promise<ActionResult<Settings>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   const parsed = settingsSchema.safeParse(formData)
   if (!parsed.success) {

@@ -1,19 +1,24 @@
 import { env } from "@/lib/env"
 
 export function getCorsHeaders(requestOrigin?: string | null): HeadersInit {
-  const allowedOrigins = [env.FRONTEND_URL, env.NEXT_PUBLIC_APP_URL].filter(Boolean)
+  const allowedOrigins = [env.FRONTEND_URL, env.NEXT_PUBLIC_APP_URL].filter(Boolean) as string[]
 
-  const origin =
+  const allowedOrigin =
     requestOrigin && allowedOrigins.includes(requestOrigin)
       ? requestOrigin
-      : env.FRONTEND_URL
+      : allowedOrigins[0] ?? null
 
-  return {
-    "Access-Control-Allow-Origin": origin,
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
   }
+
+  if (allowedOrigin) {
+    headers["Access-Control-Allow-Origin"] = allowedOrigin
+  }
+
+  return headers
 }
 
 export function corsOptionsResponse(request: Request): Response {

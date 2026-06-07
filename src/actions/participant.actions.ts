@@ -74,6 +74,7 @@ export async function updateParticipantAction(
   formData: Record<string, unknown>
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   const updateSchema = participantSchema.pick({
     name: true,
@@ -117,6 +118,7 @@ export async function deleteParticipantAction(
   eventId: string
 ): Promise<ActionResult<void>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     await deleteParticipantWithCleanup(id)
@@ -145,6 +147,7 @@ export async function toggleAttendanceAction(
   attended: boolean
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     const participant = await toggleAttendance(id, attended)
@@ -173,6 +176,7 @@ export async function toggleAmountPaidAction(
   amountPaid: boolean
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     const participant = await toggleAmountPaid(id, amountPaid)
@@ -210,7 +214,8 @@ export async function scanAttendanceAction(
   ticketCode: string,
   eventId: string
 ): Promise<ActionResult<ScanEntryData>> {
-  await getSession()
+  const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     const { found, participant } = await scanForEntry(ticketCode, eventId)
@@ -248,6 +253,7 @@ export async function confirmEntryAction(
   count: number
 ): Promise<ActionResult<{ name: string; enteredCount: number; numberOfParticipants: number; fullyEntered: boolean }>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     const updated = await markEntry(participantId, eventId, count)
@@ -301,7 +307,8 @@ export type GlobalScanData = {
 export async function scanGlobalAttendanceAction(
   ticketCode: string
 ): Promise<ActionResult<GlobalScanData>> {
-  await getSession()
+  const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     const { found, participant } = await scanForEntryGlobal(ticketCode)
@@ -351,6 +358,7 @@ export async function confirmGlobalEntryAction(
   count: number
 ): Promise<ActionResult<{ name: string; enteredCount: number; numberOfParticipants: number; fullyEntered: boolean }>> {
   const session = await getSession()
+  if (session.role === "USER") return { success: false, error: "Forbidden" }
 
   try {
     const updated = await markEntry(participantId, eventId, count)
