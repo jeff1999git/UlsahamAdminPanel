@@ -11,6 +11,7 @@ export type CreateParticipantInput = {
   email?: string | null
   age: number
   numberOfParticipants: number
+  amountPaid?: boolean
 }
 
 export type UpdateParticipantInput = {
