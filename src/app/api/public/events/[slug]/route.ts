@@ -35,10 +35,8 @@ export async function GET(
       )
     }
 
-    const { _count, bannerImageId, ...publicEvent } = event as typeof event & { _count?: unknown; bannerImageId: string }
-
     return NextResponse.json(
-      { success: true, data: { event: publicEvent } },
+      { success: true, data: { event } },
       { headers: corsHeaders }
     )
   } catch (error) {

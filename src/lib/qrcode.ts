@@ -5,7 +5,7 @@ export async function generateQRCodeBuffer(
   size = 300
 ): Promise<Buffer> {
   try {
-    const buffer = await QRCode.toBuffer(content, {
+    return QRCode.toBuffer(content, {
       type: "png",
       width: size,
       margin: 2,
@@ -15,7 +15,6 @@ export async function generateQRCodeBuffer(
       },
       errorCorrectionLevel: "H",
     })
-    return Buffer.from(buffer)
   } catch (error) {
     throw new Error(`QR code generation failed: ${error instanceof Error ? error.message : "unknown error"}`)
   }

@@ -396,7 +396,7 @@ export function ParticipantTable({
                             </Button>
                           }
                           title="Delete Participant"
-                          description={`Are you sure you want to delete ${p.name}'s registration? This will also delete their QR code.`}
+                          description={`Are you sure you want to delete ${p.name}'s registration? This action cannot be undone.`}
                           confirmLabel="Delete"
                           onConfirm={() => handleDelete(p.id)}
                         />

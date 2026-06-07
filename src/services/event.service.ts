@@ -32,7 +32,8 @@ export async function getPublishedEventBySlug(slug: string) {
   const registeredCount = await countParticipantsForEvent(event.id)
   const isFull = event.capacity !== null && registeredCount >= event.capacity
 
-  return { ...event, registeredCount, isFull }
+  const { _count, bannerImageId, ...publicFields } = event
+  return { ...publicFields, registeredCount, isFull }
 }
 
 export async function getEvents(params: EventListParams) {

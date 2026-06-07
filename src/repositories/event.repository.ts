@@ -139,7 +139,13 @@ export async function getDashboardStats() {
     prisma.participant.count(),
     prisma.event.findMany({
       where: { isFree: false, amount: { not: null } },
-      select: { amount: true, participants: { select: { numberOfParticipants: true } } },
+      select: {
+        amount: true,
+        participants: {
+          where: { amountPaid: true },
+          select: { numberOfParticipants: true },
+        },
+      },
     }),
   ])
 
