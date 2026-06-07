@@ -21,6 +21,17 @@ export async function findParticipantByTicketCode(ticketCode: string) {
   })
 }
 
+export async function findParticipantsByTicketCodes(ticketCodes: string[]) {
+  return prisma.participant.findMany({
+    where: { ticketCode: { in: ticketCodes } },
+    include: {
+      event: {
+        select: { id: true, name: true, slug: true, date: true, venue: true, bannerImageUrl: true },
+      },
+    },
+  })
+}
+
 export async function findParticipantByEventAndPhone(eventId: string, phone: string) {
   return prisma.participant.findUnique({
     where: { eventId_phone: { eventId, phone } },
