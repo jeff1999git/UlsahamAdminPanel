@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation"
+import { auth } from "@/lib/auth"
 import { Suspense } from "react"
 import Link from "next/link"
 import {
@@ -18,6 +20,19 @@ import { formatCurrency } from "@/lib/utils"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Dashboard" }
+
+export default async function DashboardPage() {
+  const session = await auth()
+  if ((session?.user as { role?: string })?.role === "USER") {
+    redirect("/admin/events")
+  }
+
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
+  )
+}
 
 async function DashboardContent() {
   const [stats, recentLogs] = await Promise.all([
@@ -87,13 +102,5 @@ async function DashboardContent() {
         <ActivityFeed logs={recentLogs} />
       </div>
     </div>
-  )
-}
-
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent />
-    </Suspense>
   )
 }

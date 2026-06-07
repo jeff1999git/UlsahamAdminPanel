@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation"
+import { redirect, notFound } from "next/navigation"
+import { auth } from "@/lib/auth"
 import { findEventById } from "@/repositories/event.repository"
 import { EventForm } from "@/components/events/event-form"
 import type { Metadata } from "next"
@@ -14,12 +15,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function EditEventPage({ params }: Props) {
+  const session = await auth()
+  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+
   const { id } = await params
   const event = await findEventById(id)
-
-  if (!event) {
-    notFound()
-  }
+  if (!event) notFound()
 
   return (
     <div className="space-y-6">

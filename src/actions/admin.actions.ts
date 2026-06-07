@@ -35,6 +35,7 @@ export async function createAdminAction(
       username: formData.get("username"),
       password: formData.get("password"),
       confirmPassword: formData.get("confirmPassword"),
+      role: formData.get("role") || "ADMIN",
     }
 
     const parsed = createAdminSchema.safeParse(raw)
@@ -44,7 +45,7 @@ export async function createAdminAction(
       return { success: false, error: msg }
     }
 
-    const { username, password } = parsed.data
+    const { username, password, role } = parsed.data
 
     const existing = await findAdminByUsername(username)
     if (existing) {
@@ -52,7 +53,7 @@ export async function createAdminAction(
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
-    const admin = await createAdminAccount({ username, passwordHash })
+    const admin = await createAdminAccount({ username, passwordHash, role })
 
     await logActivity({
       adminUsername: user.username!,
@@ -60,7 +61,7 @@ export async function createAdminAction(
       action: "ADMIN_CREATED",
       entity: "Admin",
       entityId: admin.id,
-      description: `Created admin account: ${username}`,
+      description: `Created ${role === "USER" ? "user" : "admin"} account: ${username}`,
       metadata: { username },
     })
 

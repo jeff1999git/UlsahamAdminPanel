@@ -30,12 +30,16 @@ export async function loginAction(data: {
   const session = await auth()
   if (session?.user) {
     await logActivity({
-      adminUsername: (session.user as { username?: string }).username ?? session.user.name ?? "unknown",
-      adminRole: (session.user as { role?: string }).role ?? "ADMIN",
+      adminUsername: session.user.username ?? session.user.name ?? "unknown",
+      adminRole: session.user.role ?? "ADMIN",
       action: "LOGIN",
       entity: "Admin",
-      description: `Admin ${(session.user as { username?: string }).username ?? session.user.name} logged in`,
+      description: `${session.user.username ?? session.user.name} logged in`,
     })
+
+    if (session.user.role === "USER") {
+      redirect("/admin/events")
+    }
   }
 
   redirect("/admin/dashboard")
@@ -46,11 +50,11 @@ export async function logoutAction(): Promise<void> {
 
   if (session?.user) {
     await logActivity({
-      adminUsername: (session.user as { username?: string }).username ?? "unknown",
-      adminRole: (session.user as { role?: string }).role ?? "ADMIN",
+      adminUsername: session.user.username ?? "unknown",
+      adminRole: session.user.role ?? "ADMIN",
       action: "LOGOUT",
       entity: "Admin",
-      description: `Admin ${(session.user as { username?: string }).username} logged out`,
+      description: `${session.user.username} logged out`,
     })
   }
 

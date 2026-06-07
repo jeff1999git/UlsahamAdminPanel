@@ -35,7 +35,12 @@ export function Sidebar({ username, role }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Main navigation">
         {adminNavItems
-          .filter((item) => !item.headerOnly && (!item.superAdminOnly || role === "SUPER_ADMIN"))
+          .filter(
+            (item) =>
+              !item.headerOnly &&
+              (!item.superAdminOnly || role === "SUPER_ADMIN") &&
+              (!item.adminOnly || role !== "USER")
+          )
           .map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             const Icon = item.icon
@@ -72,7 +77,12 @@ export function MobileNav({ username, role }: SidebarProps) {
     >
       <div className="flex items-center justify-around px-2 py-1">
         {adminNavItems
-          .filter((item) => !item.headerOnly && (!item.superAdminOnly || role === "SUPER_ADMIN"))
+          .filter(
+            (item) =>
+              !item.headerOnly &&
+              (!item.superAdminOnly || role === "SUPER_ADMIN") &&
+              (!item.adminOnly || role !== "USER")
+          )
           .map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             const Icon = item.icon

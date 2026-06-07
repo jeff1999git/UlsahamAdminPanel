@@ -10,6 +10,9 @@ import {
   countParticipantsForEvent,
   markAttendance,
   markAttendanceByCode,
+  scanParticipantByCode,
+  scanParticipantGlobal,
+  addEnteredCount,
 } from "@/repositories/participant.repository"
 import { findEventById } from "@/repositories/event.repository"
 import { generateAndUploadQRCode } from "@/services/qr.service"
@@ -99,9 +102,19 @@ export async function deleteParticipantWithCleanup(id: string) {
 }
 
 export async function toggleAttendance(id: string, attended: boolean) {
+  if (attended) {
+    const participant = await findParticipantById(id)
+    if (!participant) throw new Error("Participant not found")
+    return updateParticipant(id, {
+      attended: true,
+      attendedAt: new Date(),
+      enteredCount: participant.numberOfParticipants,
+    })
+  }
   return updateParticipant(id, {
-    attended,
-    attendedAt: attended ? new Date() : null,
+    attended: false,
+    attendedAt: null,
+    enteredCount: 0,
   })
 }
 
@@ -119,4 +132,20 @@ export async function checkTicketCode(ticketCode: string) {
 
 export async function scanGlobal(ticketCode: string) {
   return markAttendanceByCode(ticketCode)
+}
+
+export async function scanForEntry(ticketCode: string, eventId: string) {
+  const { found, participant } = await scanParticipantByCode(ticketCode, eventId)
+  if (!found || !participant) return { found: false, participant: null }
+  return { found: true, participant }
+}
+
+export async function scanForEntryGlobal(ticketCode: string) {
+  const { found, participant } = await scanParticipantGlobal(ticketCode)
+  if (!found || !participant) return { found: false, participant: null }
+  return { found: true, participant }
+}
+
+export async function markEntry(participantId: string, eventId: string, count: number) {
+  return addEnteredCount(participantId, eventId, count)
 }

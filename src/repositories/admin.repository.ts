@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma"
+import type { AdminRole } from "@prisma/client"
 
 export async function findAllAdmins() {
   return prisma.admin.findMany({
-    where: { role: "ADMIN" },
+    where: { role: { in: ["ADMIN", "USER"] } },
     select: {
       id: true,
       username: true,
@@ -26,12 +27,13 @@ export async function findAdminByUsername(username: string) {
 export async function createAdminAccount(data: {
   username: string
   passwordHash: string
+  role: AdminRole
 }) {
   return prisma.admin.create({
     data: {
       username: data.username,
       passwordHash: data.passwordHash,
-      role: "ADMIN",
+      role: data.role,
       isActive: true,
     },
   })

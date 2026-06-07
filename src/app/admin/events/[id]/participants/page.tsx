@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-
+import { auth } from "@/lib/auth"
 import { findEventById } from "@/repositories/event.repository"
 import { getAllParticipantsForEvent } from "@/repositories/participant.repository"
 import { ParticipantTable } from "@/components/participants/participant-table"
@@ -20,6 +20,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ParticipantsPage({ params }: Props) {
+  const session = await auth()
+  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+
   const { id } = await params
 
   const [event, participants] = await Promise.all([

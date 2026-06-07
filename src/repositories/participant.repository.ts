@@ -137,6 +137,49 @@ export async function pruneOldEventParticipants() {
   }
 }
 
+export async function scanParticipantByCode(ticketCode: string, eventId: string) {
+  const participant = await prisma.participant.findUnique({ where: { ticketCode } })
+  if (!participant || participant.eventId !== eventId) return { found: false, participant: null }
+  return { found: true, participant }
+}
+
+export async function scanParticipantGlobal(ticketCode: string) {
+  const participant = await prisma.participant.findUnique({
+    where: { ticketCode },
+    include: {
+      event: { select: { id: true, name: true, slug: true, date: true, venue: true } },
+    },
+  })
+  if (!participant) return { found: false, participant: null }
+  return { found: true, participant }
+}
+
+export async function addEnteredCount(id: string, eventId: string, count: number) {
+  const participant = await prisma.participant.findUnique({ where: { id } })
+  if (!participant) throw new Error("Participant not found")
+  if (participant.eventId !== eventId) throw new Error("Participant does not belong to this event")
+
+  const remaining = participant.numberOfParticipants - participant.enteredCount
+  if (count < 1 || count > remaining) {
+    throw new Error(`Entry count must be between 1 and ${remaining}`)
+  }
+
+  // Atomic increment to avoid TOCTOU race under concurrent scans
+  const updated = await prisma.participant.update({
+    where: { id },
+    data: {
+      enteredCount: { increment: count },
+      attendedAt: participant.attendedAt ?? new Date(),
+    },
+  })
+
+  // Mark fully attended when all members have entered (idempotent second write)
+  if (updated.enteredCount >= updated.numberOfParticipants && !updated.attended) {
+    return prisma.participant.update({ where: { id }, data: { attended: true } })
+  }
+  return updated
+}
+
 export async function markAttendanceByCode(ticketCode: string) {
   const eventInclude = { select: { id: true, name: true, date: true, venue: true } } as const
 
