@@ -38,6 +38,13 @@ export async function findParticipantByEventAndPhone(eventId: string, phone: str
   })
 }
 
+export async function findTicketCodesByEmail(email: string) {
+  return prisma.participant.findMany({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { ticketCode: true },
+  })
+}
+
 export async function listParticipants(params: ParticipantListParams) {
   const {
     eventId,
