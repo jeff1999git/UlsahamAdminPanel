@@ -3,7 +3,7 @@ import { paymentOrderRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug } from "@/services/event.service"
-import { findParticipantByEventAndPhone, countParticipantsForEvent } from "@/repositories/participant.repository"
+import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { getRazorpay } from "@/lib/razorpay"
 import { calculateTicketFees } from "@/lib/pricing"
 
@@ -59,25 +59,14 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
     }
 
-    const existing = await findParticipantByEventAndPhone(event.id, parsed.data.phone)
-
-    // Block only fully-paid registrations; allow re-payment (amountPaid: false)
-    if (existing?.amountPaid) {
-      return NextResponse.json(
-        { success: false, error: "This phone number is already registered for this event" },
-        { status: 409, headers: corsHeaders }
-      )
-    }
-
-    // For new registrations check capacity; re-payments already occupy a slot
-    if (!existing && event.capacity !== null) {
+    if (event.capacity !== null) {
       const currentCount = await countParticipantsForEvent(event.id)
       if (currentCount + parsed.data.numberOfParticipants > event.capacity) {
         return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
       }
     }
 
-    const quantity = existing ? existing.numberOfParticipants : parsed.data.numberOfParticipants
+    const quantity = parsed.data.numberOfParticipants
     const { total } = calculateTicketFees(event.amount, quantity)
     const totalAmountPaise = Math.round(total * 100)
 
