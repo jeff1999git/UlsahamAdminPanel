@@ -9,6 +9,7 @@ import {
   updateEvent,
   deleteEvent,
   getDashboardStats,
+  findEventCoupons,
 } from "@/repositories/event.repository"
 import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { deleteImage } from "@/lib/cloudinary"
@@ -16,6 +17,17 @@ import { generateSlug } from "@/lib/slug"
 import { sanitizeString } from "@/lib/utils"
 import type { CreateEventInput, UpdateEventInput, EventListParams } from "@/types/event.types"
 import type { EventStatus } from "@prisma/client"
+
+function getEffectiveAmount(event: {
+  isFree: boolean
+  amount: number | null
+  isEarlyBird?: boolean
+  earlyBirdAmount?: number | null
+}): number | null {
+  if (event.isFree) return null
+  if (event.isEarlyBird && event.earlyBirdAmount != null) return event.earlyBirdAmount
+  return event.amount
+}
 
 export async function getEventById(id: string) {
   return findEventById(id)
@@ -31,9 +43,10 @@ export async function getPublishedEventBySlug(slug: string) {
 
   const registeredCount = await countParticipantsForEvent(event.id)
   const isFull = event.capacity !== null && registeredCount >= event.capacity
+  const effectiveAmount = getEffectiveAmount(event)
 
-  const { _count, bannerImageId, ...publicFields } = event
-  return { ...publicFields, registeredCount, isFull }
+  const { _count, bannerImageId, couponCodes, ...publicFields } = event
+  return { ...publicFields, registeredCount, isFull, effectiveAmount }
 }
 
 export async function getEvents(params: EventListParams) {
@@ -55,8 +68,9 @@ export async function getPublishedEvents(params: {
     result.events.map(async (event) => {
       const registeredCount = event._count.participants
       const isFull = event.capacity !== null && registeredCount >= event.capacity
-      const { _count, ...rest } = event
-      return { ...rest, registeredCount, isFull }
+      const effectiveAmount = getEffectiveAmount(event)
+      const { _count, couponCodes, ...rest } = event
+      return { ...rest, registeredCount, isFull, effectiveAmount }
     })
   )
 
@@ -73,6 +87,7 @@ export async function createNewEvent(input: CreateEventInput) {
     slug = `${baseSlug}-${Date.now().toString(36).slice(-5)}`
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return createEvent({
     name: sanitizeString(input.name),
     slug: slug,
@@ -86,10 +101,13 @@ export async function createNewEvent(input: CreateEventInput) {
     endTime: input.endTime,
     isFree: input.isFree,
     amount: input.isFree ? null : (input.amount ?? null),
+    earlyBirdAmount: input.isFree ? null : (input.earlyBirdAmount ?? null),
+    isEarlyBird: input.isFree ? false : (input.isEarlyBird ?? false),
     status: input.status,
     capacity: input.capacity ?? null,
     featured: input.featured,
-  })
+    couponCodes: { set: input.couponCodes ?? [] },
+  } as Parameters<typeof createEvent>[0])
 }
 
 export async function updateExistingEvent(id: string, input: UpdateEventInput) {
@@ -109,10 +127,18 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.status !== undefined) updateData.status = input.status
   if (input.featured !== undefined) updateData.featured = input.featured
   if (input.capacity !== undefined) updateData.capacity = input.capacity ?? null
+  if (input.couponCodes !== undefined) updateData.couponCodes = { set: input.couponCodes }
+  if (input.earlyBirdAmount !== undefined) updateData.earlyBirdAmount = input.earlyBirdAmount ?? null
+  if (input.isEarlyBird !== undefined) updateData.isEarlyBird = input.isEarlyBird
 
   if (input.isFree !== undefined) {
     updateData.isFree = input.isFree
     updateData.amount = input.isFree ? null : (input.amount ?? null)
+    if (input.isFree) {
+      updateData.earlyBirdAmount = null
+      updateData.isEarlyBird = false
+      updateData.couponCodes = { set: [] }
+    }
   }
 
   if (
@@ -146,4 +172,4 @@ export async function toggleEventStatus(id: string, status: EventStatus) {
   return updateEvent(id, { status })
 }
 
-export { getDashboardStats }
+export { getDashboardStats, findEventCoupons }

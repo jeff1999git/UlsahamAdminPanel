@@ -1,11 +1,18 @@
 import type { NextAuthConfig } from "next-auth"
 
-const USER_RESTRICTED = ["/admin/dashboard", "/admin/scan", "/admin/logs", "/admin/settings", "/admin/admins", "/admin/events/new"]
+const USER_RESTRICTED = ["/admin/dashboard", "/admin/scan", "/admin/logs", "/admin/settings", "/admin/admins"]
 
 function isUserRestrictedPath(pathname: string) {
   if (USER_RESTRICTED.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true
   // Block /admin/events/[id]/edit, /participants, /scan
   if (/^\/admin\/events\/[^/]+\/(edit|participants|scan)(\/|$)/.test(pathname)) return true
+  return false
+}
+
+function isAdminRestrictedPath(pathname: string) {
+  // SUPER_ADMIN only: create or edit events
+  if (pathname === "/admin/events/new") return true
+  if (/^\/admin\/events\/[^/]+\/edit(\/|$)/.test(pathname)) return true
   return false
 }
 
@@ -37,7 +44,12 @@ export const authConfig: NextAuthConfig = {
       if (isAdminRoute) {
         if (!isLoggedIn) return Response.redirect(new URL("/login", nextUrl))
 
-        // USER role cannot access restricted pages
+        // SUPER_ADMIN only paths — block ADMIN and USER
+        if (role !== "SUPER_ADMIN" && isAdminRestrictedPath(nextUrl.pathname)) {
+          return Response.redirect(new URL("/admin/events", nextUrl))
+        }
+
+        // USER role cannot access admin-only pages
         if (role === "USER" && isUserRestrictedPath(nextUrl.pathname)) {
           return Response.redirect(new URL("/admin/events", nextUrl))
         }

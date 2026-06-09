@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { paymentOrderRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { participantSchema } from "@/validators/participant.validator"
-import { getPublishedEventBySlug } from "@/services/event.service"
+import { getPublishedEventBySlug, findEventCoupons } from "@/services/event.service"
 import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { getRazorpay } from "@/lib/razorpay"
 import { calculateTicketFees } from "@/lib/pricing"
+
+const orderBodySchema = participantSchema.extend({
+  couponCode: z.string().max(50).optional(),
+})
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request)
@@ -39,7 +44,7 @@ export async function POST(
     )
   }
 
-  const parsed = participantSchema.safeParse(body)
+  const parsed = orderBodySchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
       { success: false, error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors },
@@ -52,7 +57,7 @@ export async function POST(
     if (!event) {
       return NextResponse.json({ success: false, error: "Event not found" }, { status: 404, headers: corsHeaders })
     }
-    if (event.isFree || !event.amount) {
+    if (event.isFree || !event.effectiveAmount) {
       return NextResponse.json({ success: false, error: "This is a free event — use the register endpoint" }, { status: 400, headers: corsHeaders })
     }
     if (event.isFull) {
@@ -66,9 +71,28 @@ export async function POST(
       }
     }
 
+    // Resolve coupon discount
+    let couponDiscount = 0
+    let appliedCouponCode: string | undefined
+
+    if (parsed.data.couponCode) {
+      const coupons = await findEventCoupons(event.id)
+      const coupon = coupons.find(
+        (c) => c.code.toUpperCase() === parsed.data.couponCode!.toUpperCase()
+      )
+      if (!coupon) {
+        return NextResponse.json(
+          { success: false, error: "Invalid coupon code" },
+          { status: 400, headers: corsHeaders }
+        )
+      }
+      couponDiscount = coupon.discount
+      appliedCouponCode = coupon.code
+    }
+
     const quantity = parsed.data.numberOfParticipants
-    const { total } = calculateTicketFees(event.amount, quantity)
-    const totalAmountPaise = Math.round(total * 100)
+    const breakdown = calculateTicketFees(event.effectiveAmount, quantity, couponDiscount)
+    const totalAmountPaise = Math.round(breakdown.total * 100)
 
     const keyId = process.env.RAZORPAY_KEY_ID
     if (!keyId) throw new Error("Payment gateway not configured")
@@ -85,6 +109,7 @@ export async function POST(
         email: parsed.data.email ?? "",
         age: String(parsed.data.age),
         numberOfParticipants: String(quantity),
+        ...(appliedCouponCode ? { couponCode: appliedCouponCode, couponDiscount: String(couponDiscount) } : {}),
       },
     })
 
@@ -96,7 +121,7 @@ export async function POST(
           amount: totalAmountPaise,
           currency: "INR",
           keyId,
-          breakdown: calculateTicketFees(event.amount, quantity),
+          breakdown,
         },
       },
       { headers: corsHeaders }

@@ -23,18 +23,19 @@ export const metadata: Metadata = { title: "Dashboard" }
 
 export default async function DashboardPage() {
   const session = await auth()
-  if ((session?.user as { role?: string })?.role === "USER") {
-    redirect("/admin/events")
-  }
+  const role = (session?.user as { role?: string })?.role
+  if (role === "USER") redirect("/admin/events")
+
+  const isSuperAdmin = role === "SUPER_ADMIN"
 
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent />
+      <DashboardContent isSuperAdmin={isSuperAdmin} />
     </Suspense>
   )
 }
 
-async function DashboardContent() {
+async function DashboardContent({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [stats, recentLogs] = await Promise.all([
     getDashboardStats(),
     getRecentActivityLogs(20, 15),
@@ -82,12 +83,14 @@ async function DashboardContent() {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
-        <Button asChild>
-          <Link href="/admin/events/new">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Event
-          </Link>
-        </Button>
+        {isSuperAdmin && (
+          <Button asChild>
+            <Link href="/admin/events/new">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Event
+            </Link>
+          </Button>
+        )}
         <Button variant="outline" asChild>
           <Link href="/admin/events">
             <CalendarDays className="h-4 w-4 mr-2" />

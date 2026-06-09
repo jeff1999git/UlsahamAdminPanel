@@ -38,9 +38,12 @@ model Event {
   endTime                  String
   isFree                   Boolean       @default(true)
   amount                   Float?
+  earlyBirdAmount          Float?
+  isEarlyBird              Boolean       @default(false)
   status                   EventStatus   @default(ANNOUNCED)
   capacity                 Int?
   featured                 Boolean       @default(false)
+  couponCodes              CouponCode[]
   archivedParticipantCount Int           @default(0)
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
@@ -55,6 +58,11 @@ enum EventStatus {
   PUBLISHED
   CANCELLED
   COMPLETED
+}
+
+type CouponCode {
+  code     String
+  discount Float
 }
 
 model Participant {

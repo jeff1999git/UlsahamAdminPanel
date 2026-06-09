@@ -1,23 +1,19 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import {
   ChevronRight,
   Pencil,
-  Trash2,
   Users,
   QrCode,
-  Eye,
-  EyeOff,
   Calendar,
   MapPin,
   DollarSign,
   UserPlus,
   CheckCircle2,
 } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -26,20 +22,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { EventStatusBadge } from "@/components/events/event-status-badge"
 import { TableEmpty } from "@/components/shared/data-table"
 import { EnrollDialog } from "@/components/participants/enroll-dialog"
-import { deleteEventAction, toggleEventStatusAction } from "@/actions/event.actions"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import type { EventWithParticipantCount } from "@/types/event.types"
 
@@ -50,16 +35,15 @@ function participantCount(event: EventWithParticipantCount): number {
 interface EventTableProps {
   events: EventWithParticipantCount[]
   isUser?: boolean
+  isSuperAdmin?: boolean
 }
 
 const ENROLL_STORAGE_KEY = "ulsaham_user_enrollments"
 
-export function EventTable({ events, isUser = false }: EventTableProps) {
+export function EventTable({ events, isUser = false, isSuperAdmin = false }: EventTableProps) {
   const [selected, setSelected] = useState<EventWithParticipantCount | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [enrollEvent, setEnrollEvent] = useState<EventWithParticipantCount | null>(null)
   const [enrolledEventIds, setEnrolledEventIds] = useState<Set<string>>(new Set())
-  const [, startTransition] = useTransition()
 
   useEffect(() => {
     if (!isUser) return
@@ -79,34 +63,6 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
       return next
     })
     setEnrollEvent(null)
-  }
-
-  function handleToggleStatus() {
-    if (!selected) return
-    const newStatus = selected.status === "PUBLISHED" ? "ANNOUNCED" : "PUBLISHED"
-    startTransition(async () => {
-      const result = await toggleEventStatusAction(selected.id, newStatus as "PUBLISHED" | "ANNOUNCED")
-      if (result.success) {
-        toast.success(`Event ${newStatus === "PUBLISHED" ? "published" : "unpublished"}`)
-        setSelected(null)
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
-  function handleDelete() {
-    if (!selected) return
-    startTransition(async () => {
-      const result = await deleteEventAction(selected.id)
-      if (result.success) {
-        toast.success("Event deleted")
-        setConfirmDelete(false)
-        setSelected(null)
-      } else {
-        toast.error(result.error)
-      }
-    })
   }
 
   if (events.length === 0) {
@@ -202,6 +158,19 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
                   <DollarSign className="h-4 w-4 text-black/40 shrink-0" />
                   {selected.isFree ? (
                     <span className="text-sm font-medium text-[#014421]">Free</span>
+                  ) : (selected as { isEarlyBird?: boolean; earlyBirdAmount?: number | null }).isEarlyBird &&
+                    (selected as { earlyBirdAmount?: number | null }).earlyBirdAmount != null ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-sm line-through text-black/40">
+                        {formatCurrency(selected.amount ?? 0)}
+                      </span>
+                      <span className="text-sm font-medium text-[#014421]">
+                        {formatCurrency((selected as { earlyBirdAmount: number }).earlyBirdAmount)}
+                      </span>
+                      <span className="text-xs text-[#014421] bg-[#014421]/10 px-1.5 py-0.5 rounded-full">
+                        Early bird
+                      </span>
+                    </span>
                   ) : (
                     <span className="text-sm text-black">{formatCurrency(selected.amount ?? 0)}</span>
                   )}
@@ -219,8 +188,9 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
 
               {/* Actions */}
               <div className="border-t pt-4 space-y-2">
-                <div className={`grid gap-2 ${isUser ? "grid-cols-1" : "grid-cols-3"}`}>
-                  {!isUser && (
+                {/* Row 1: Edit / Guests / Scan (or Enroll for user) */}
+                <div className={`grid gap-2 ${isUser ? "grid-cols-1" : isSuperAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
+                  {!isUser && isSuperAdmin && (
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/admin/events/${selected.id}/edit`}>
                         <Pencil className="h-3.5 w-3.5 mr-1.5" />
@@ -266,40 +236,6 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
                   )}
                 </div>
 
-                {!isUser && (
-                  <>
-                    {selected.status !== "CANCELLED" && selected.status !== "COMPLETED" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full"
-                        onClick={handleToggleStatus}
-                      >
-                        {selected.status === "PUBLISHED" ? (
-                          <>
-                            <EyeOff className="h-3.5 w-3.5 mr-2" />
-                            Unpublish
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-3.5 w-3.5 mr-2" />
-                            Publish
-                          </>
-                        )}
-                      </Button>
-                    )}
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
-                      onClick={() => setConfirmDelete(true)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-2" />
-                      Delete Event
-                    </Button>
-                  </>
-                )}
               </div>
             </div>
           </DialogContent>
@@ -319,27 +255,6 @@ export function EventTable({ events, isUser = false }: EventTableProps) {
         />
       )}
 
-      {/* Delete confirmation — separate portal, overlays the detail dialog */}
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Event</AlertDialogTitle>
-            <AlertDialogDescription>
-              {selected && participantCount(selected) > 0
-                ? `This event has ${participantCount(selected)} participant(s). It will be marked as Cancelled instead of deleted.`
-                : "Are you sure you want to delete this event? This action cannot be undone."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button variant="destructive" onClick={handleDelete}>
-                Delete
-              </Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }

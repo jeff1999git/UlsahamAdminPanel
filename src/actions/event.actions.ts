@@ -29,7 +29,7 @@ export async function createEventAction(
   formData: Record<string, unknown>
 ): Promise<ActionResult<Event>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   const parsed = createEventSchema.safeParse(formData)
   if (!parsed.success) {
@@ -63,7 +63,7 @@ export async function updateEventAction(
   formData: Record<string, unknown>
 ): Promise<ActionResult<Event>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   const parsed = updateEventSchema.safeParse(formData)
   if (!parsed.success) {
@@ -97,7 +97,7 @@ export async function updateEventAction(
 
 export async function deleteEventAction(id: string): Promise<ActionResult<void>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   try {
     const existing = await getEventById(id)
@@ -127,7 +127,7 @@ export async function toggleEventStatusAction(
   status: EventStatus
 ): Promise<ActionResult<Event>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   try {
     const event = await toggleEventStatus(id, status)

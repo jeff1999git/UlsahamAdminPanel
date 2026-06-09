@@ -49,6 +49,13 @@ export const myTicketsRateLimit = new Ratelimit({
   prefix: "ulsaham:my-tickets",
 })
 
+export const couponValidateRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "1 m"),
+  analytics: true,
+  prefix: "ulsaham:coupon-validate",
+})
+
 export const myTicketsByUserRateLimit = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(10, "1 m"),

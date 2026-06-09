@@ -20,7 +20,7 @@ interface SearchParams {
   status?: string
 }
 
-async function EventsList({ searchParams, isUser }: { searchParams: SearchParams; isUser: boolean }) {
+async function EventsList({ searchParams, isUser, isSuperAdmin }: { searchParams: SearchParams; isUser: boolean; isSuperAdmin: boolean }) {
   const page = parseInt(searchParams.page ?? "1")
   const search = searchParams.search ?? ""
   const statusParam = searchParams.status ?? ""
@@ -43,7 +43,7 @@ async function EventsList({ searchParams, isUser }: { searchParams: SearchParams
 
   return (
     <div className="space-y-4">
-      <EventTable events={events} isUser={isUser} />
+      <EventTable events={events} isUser={isUser} isSuperAdmin={isSuperAdmin} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-black">
           {total} event{total !== 1 ? "s" : ""} total
@@ -65,7 +65,9 @@ export default async function EventsPage({
   searchParams: Promise<SearchParams>
 }) {
   const session = await auth()
-  const isUser = (session?.user as { role?: string })?.role === "USER"
+  const role = (session?.user as { role?: string })?.role
+  const isUser = role === "USER"
+  const isSuperAdmin = role === "SUPER_ADMIN"
   const params = await searchParams
 
   return (
@@ -75,7 +77,7 @@ export default async function EventsPage({
           <h1 className="text-2xl font-bold text-black">Events</h1>
           <p className="text-sm text-black mt-1">Manage your events</p>
         </div>
-        {!isUser && (
+        {isSuperAdmin && (
           <Button asChild>
             <Link href="/admin/events/new">
               <Plus className="h-4 w-4 mr-2" />
@@ -90,7 +92,7 @@ export default async function EventsPage({
       </Suspense>
 
       <Suspense fallback={<TableSkeleton rows={5} cols={1} />}>
-        <EventsList searchParams={params} isUser={isUser} />
+        <EventsList searchParams={params} isUser={isUser} isSuperAdmin={isSuperAdmin} />
       </Suspense>
     </div>
   )
