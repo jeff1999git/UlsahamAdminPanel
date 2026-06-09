@@ -1,6 +1,17 @@
 import { z } from "zod"
 import { EventStatus } from "@prisma/client"
 
+const couponCodeSchema = z.object({
+  code: z
+    .string()
+    .min(1, "Code is required")
+    .max(50, "Code must be at most 50 characters")
+    .transform((v) => v.toUpperCase()),
+  discount: z.coerce.number().positive("Discount must be a positive number"),
+})
+
+export type CouponCodeFormValue = z.infer<typeof couponCodeSchema>
+
 const baseEventSchema = z.object({
   name: z
     .string()
@@ -36,23 +47,39 @@ const baseEventSchema = z.object({
     .regex(/^\d{1,2}:\d{2}\s?(AM|PM)$/i, "Invalid time format"),
   isFree: z.boolean().default(true),
   amount: z.coerce.number().positive("Amount must be positive").optional().nullable(),
+  earlyBirdAmount: z.coerce.number().positive("Early bird amount must be positive").optional().nullable(),
+  isEarlyBird: z.boolean().default(false),
   status: z.nativeEnum(EventStatus).default(EventStatus.ANNOUNCED),
   capacity: z.coerce.number().int().positive("Capacity must be a positive integer").optional().nullable(),
   featured: z.boolean().default(false),
+  couponCodes: z.array(couponCodeSchema).optional(),
 })
 
-export const createEventSchema = baseEventSchema.refine(
-  (data) => {
-    if (!data.isFree && (data.amount === undefined || data.amount === null)) {
-      return false
+export const createEventSchema = baseEventSchema
+  .refine(
+    (data) => {
+      if (!data.isFree && (data.amount === undefined || data.amount === null)) {
+        return false
+      }
+      return true
+    },
+    {
+      message: "Amount is required for paid events",
+      path: ["amount"],
     }
-    return true
-  },
-  {
-    message: "Amount is required for paid events",
-    path: ["amount"],
-  }
-)
+  )
+  .refine(
+    (data) => {
+      if (!data.date) return true
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return data.date >= today
+    },
+    {
+      message: "Event date must be today or in the future",
+      path: ["date"],
+    }
+  )
 
 export const updateEventSchema = baseEventSchema
   .partial()

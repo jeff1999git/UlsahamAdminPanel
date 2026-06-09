@@ -74,7 +74,7 @@ export async function updateParticipantAction(
   formData: Record<string, unknown>
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   const updateSchema = participantSchema.pick({
     name: true,
@@ -118,7 +118,7 @@ export async function deleteParticipantAction(
   eventId: string
 ): Promise<ActionResult<void>> {
   const session = await getSession()
-  if (session.role === "USER") return { success: false, error: "Forbidden" }
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   try {
     await deleteParticipantWithCleanup(id)

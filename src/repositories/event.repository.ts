@@ -111,6 +111,14 @@ export async function autoCompleteExpiredEvents() {
   })
 }
 
+export async function findEventCoupons(eventId: string) {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { couponCodes: true },
+  })
+  return event?.couponCodes ?? []
+}
+
 export async function createEvent(data: Prisma.EventCreateInput) {
   return prisma.event.create({ data })
 }

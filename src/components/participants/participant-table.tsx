@@ -372,34 +372,38 @@ export function ParticipantTable({
                             <UserCheck className="h-4 w-4 text-green-600" />
                           )}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => {
-                            setEditParticipant(p)
-                            setEditOpen(true)
-                          }}
-                          aria-label="Edit participant"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-500 hover:text-red-700"
-                              aria-label="Delete participant"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          }
-                          title="Delete Participant"
-                          description={`Are you sure you want to delete ${p.name}'s registration? This action cannot be undone.`}
-                          confirmLabel="Delete"
-                          onConfirm={() => handleDelete(p.id)}
-                        />
+                        {isSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              setEditParticipant(p)
+                              setEditOpen(true)
+                            }}
+                            aria-label="Edit participant"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {isSuperAdmin && (
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-500 hover:text-red-700"
+                                aria-label="Delete participant"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            }
+                            title="Delete Participant"
+                            description={`Are you sure you want to delete ${p.name}'s registration? This action cannot be undone.`}
+                            confirmLabel="Delete"
+                            onConfirm={() => handleDelete(p.id)}
+                          />
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -506,43 +510,45 @@ export function ParticipantTable({
                   </Button>
                 )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Edit */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const p = selectedMobile
-                      setSelectedMobile(null)
-                      setEditParticipant(p)
-                      setEditOpen(true)
-                    }}
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                    Edit
-                  </Button>
+                {isSuperAdmin && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Edit */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const p = selectedMobile
+                        setSelectedMobile(null)
+                        setEditParticipant(p)
+                        setEditOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                      Edit
+                    </Button>
 
-                  {/* Delete */}
-                  <ConfirmDialog
-                    trigger={
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                        Delete
-                      </Button>
-                    }
-                    title="Delete Participant"
-                    description={`Are you sure you want to delete ${selectedMobile.name}'s registration? This will also delete their QR code.`}
-                    confirmLabel="Delete"
-                    onConfirm={() => {
-                      handleDelete(selectedMobile.id)
-                      setSelectedMobile(null)
-                    }}
-                  />
-                </div>
+                    {/* Delete */}
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          Delete
+                        </Button>
+                      }
+                      title="Delete Participant"
+                      description={`Are you sure you want to delete ${selectedMobile.name}'s registration? This will also delete their QR code.`}
+                      confirmLabel="Delete"
+                      onConfirm={() => {
+                        handleDelete(selectedMobile.id)
+                        setSelectedMobile(null)
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </DialogContent>

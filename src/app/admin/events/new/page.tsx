@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "New Event" }
 
 export default async function NewEventPage() {
   const session = await auth()
-  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+  if ((session?.user as { role?: string })?.role !== "SUPER_ADMIN") redirect("/admin/events")
 
   return (
     <div className="space-y-6 max-w-5xl">
