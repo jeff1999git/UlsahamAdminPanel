@@ -63,6 +63,13 @@ export const myTicketsByUserRateLimit = new Ratelimit({
   prefix: "ulsaham:my-tickets-by-user",
 })
 
+export const brandPartnersRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, "1 m"),
+  analytics: true,
+  prefix: "ulsaham:brand-partners",
+})
+
 export function getClientIP(request: Request): string {
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
