@@ -6,6 +6,7 @@ import { findEventById } from "@/repositories/event.repository"
 import { getAllParticipantsForEvent } from "@/repositories/participant.repository"
 import { ParticipantTable } from "@/components/participants/participant-table"
 import { AddParticipantDialog } from "@/components/participants/add-participant-dialog"
+import { ImportParticipantsDialog } from "@/components/participants/import-participants-dialog"
 import { formatDate } from "@/lib/utils"
 import type { Metadata } from "next"
 
@@ -49,7 +50,10 @@ export default async function ParticipantsPage({ params }: Props) {
           <h1 className="text-2xl font-bold tracking-tight">Participants</h1>
           <p className="text-black text-sm mt-1">{event.name}</p>
         </div>
-        <AddParticipantDialog eventId={id} />
+        <div className="flex items-center gap-2">
+          {role === "SUPER_ADMIN" && <ImportParticipantsDialog eventId={id} />}
+          <AddParticipantDialog eventId={id} />
+        </div>
       </div>
 
       <ParticipantTable
