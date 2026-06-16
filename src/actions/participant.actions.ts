@@ -391,6 +391,67 @@ export async function confirmGlobalEntryAction(
   }
 }
 
+export type BulkImportRow = {
+  row: number
+  name: string
+  phone: string
+  email: string
+  age: number
+  numberOfParticipants: number
+}
+
+export type BulkImportResult = {
+  added: number
+  skipped: number
+  errors: Array<{ row: number; name: string; error: string }>
+}
+
+export async function bulkAddParticipantsAction(
+  eventId: string,
+  rows: BulkImportRow[]
+): Promise<ActionResult<BulkImportResult>> {
+  const session = await getSession()
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
+
+  const result: BulkImportResult = { added: 0, skipped: 0, errors: [] }
+
+  for (const row of rows) {
+    try {
+      await registerParticipant({
+        eventId,
+        name: row.name,
+        phone: row.phone,
+        email: row.email || null,
+        age: row.age,
+        numberOfParticipants: row.numberOfParticipants,
+      })
+      result.added++
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to add"
+      if (msg === "Phone number already registered for this event") {
+        result.skipped++
+      } else {
+        result.errors.push({ row: row.row, name: row.name, error: msg })
+      }
+    }
+  }
+
+  if (result.added > 0) {
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "PARTICIPANT_ADDED",
+      entity: "Participant",
+      entityId: eventId,
+      description: `Bulk imported ${result.added} participants from Excel (${result.skipped} skipped, ${result.errors.length} failed)`,
+      metadata: { eventId, added: result.added, skipped: result.skipped, failed: result.errors.length },
+    })
+  }
+
+  revalidatePath(`/admin/events/${eventId}/participants`)
+  return { success: true, data: result }
+}
+
 export async function exportParticipantsAction(eventId: string) {
   await getSession()
   return getAllParticipants(eventId)

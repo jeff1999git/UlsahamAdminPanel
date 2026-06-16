@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { uploadImage } from "@/lib/cloudinary"
-import { CLOUDINARY_EVENTS_FOLDER, ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_BYTES } from "@/constants"
+import {
+  CLOUDINARY_EVENTS_FOLDER,
+  CLOUDINARY_BRAND_PARTNERS_FOLDER,
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_SIZE_BYTES,
+} from "@/constants"
 
 export async function POST(request: NextRequest) {
   const session = await auth()
@@ -34,7 +39,11 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const { url, publicId } = await uploadImage(buffer, CLOUDINARY_EVENTS_FOLDER)
+    const folderParam = request.nextUrl.searchParams.get("folder")
+    const folder =
+      folderParam === "brand-partners" ? CLOUDINARY_BRAND_PARTNERS_FOLDER : CLOUDINARY_EVENTS_FOLDER
+
+    const { url, publicId } = await uploadImage(buffer, folder)
 
     return NextResponse.json({ url, publicId })
   } catch (error) {

@@ -2,6 +2,7 @@ export const APP_NAME = "Ulsaham Entertainments"
 export const APP_DESCRIPTION = "Event Management Admin Panel"
 export const TICKET_CODE_PREFIX = "UE"
 export const CLOUDINARY_EVENTS_FOLDER = "ulsaham/events"
+export const CLOUDINARY_BRAND_PARTNERS_FOLDER = "ulsaham/brand-partners"
 export const MAX_IMAGE_SIZE_MB = 5
 export const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
