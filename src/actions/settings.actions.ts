@@ -3,10 +3,11 @@
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { logActivity } from "@/lib/activity-logger"
-import { getSettings, upsertSettings } from "@/repositories/settings.repository"
+import { getSettings, upsertSettings, addBrandPartner, removeBrandPartner } from "@/repositories/settings.repository"
+import { deleteImage } from "@/lib/cloudinary"
 import { settingsSchema } from "@/validators/settings.validator"
 import type { ActionResult } from "@/types"
-import type { Settings } from "@prisma/client"
+import type { Settings, BrandPartner } from "@prisma/client"
 
 async function getSession() {
   const session = await auth()
@@ -54,6 +55,63 @@ export async function updateSettingsAction(
     return { success: true, data: settings }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to update settings"
+    return { success: false, error: msg }
+  }
+}
+
+export async function addBrandPartnerAction(partner: {
+  name: string
+  logoUrl: string
+  logoId: string
+}): Promise<ActionResult<BrandPartner>> {
+  const session = await getSession()
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
+
+  try {
+    const id = crypto.randomUUID()
+    const newPartner = { id, ...partner }
+    await addBrandPartner(newPartner)
+
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "SETTINGS_UPDATED",
+      entity: "Settings",
+      description: `Added brand partner: ${partner.name}`,
+    })
+
+    revalidatePath("/admin/settings")
+    return { success: true, data: newPartner as BrandPartner }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to add brand partner"
+    return { success: false, error: msg }
+  }
+}
+
+export async function removeBrandPartnerAction(
+  partnerId: string,
+  logoId: string
+): Promise<ActionResult<void>> {
+  const session = await getSession()
+  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
+
+  try {
+    await removeBrandPartner(partnerId)
+    await deleteImage(logoId)
+
+    await logActivity({
+      adminUsername: session.username,
+      adminRole: session.role,
+      action: "SETTINGS_UPDATED",
+      entity: "Settings",
+      description: "Removed brand partner",
+      metadata: { partnerId },
+    })
+
+    revalidatePath("/admin/settings")
+    return { success: true, data: undefined }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to remove brand partner"
     return { success: false, error: msg }
   }
 }

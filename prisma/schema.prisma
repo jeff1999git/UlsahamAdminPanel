@@ -89,17 +89,25 @@ model Participant {
   @@index([email])
 }
 
+type BrandPartner {
+  id      String
+  name    String
+  logoUrl String
+  logoId  String
+}
+
 model Settings {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  companyName String   @default("Ulsaham Entertainments")
-  address     String?
-  email       String?
-  phone       String?
-  facebook    String?
-  instagram   String?
-  youtube     String?
-  linkedin    String?
-  updatedAt   DateTime @updatedAt
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  companyName   String         @default("Ulsaham Entertainments")
+  address       String?
+  email         String?
+  phone         String?
+  facebook      String?
+  instagram     String?
+  youtube       String?
+  linkedin      String?
+  brandPartners BrandPartner[]
+  updatedAt     DateTime       @updatedAt
 }
 
 model ActivityLog {
