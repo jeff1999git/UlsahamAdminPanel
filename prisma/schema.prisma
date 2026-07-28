@@ -25,9 +25,9 @@ enum AdminRole {
 }
 
 model Event {
-  id                       String        @id @default(auto()) @map("_id") @db.ObjectId
+  id                       String              @id @default(auto()) @map("_id") @db.ObjectId
   name                     String
-  slug                     String        @unique
+  slug                     String              @unique
   description              String
   bannerImageUrl           String
   bannerImageId            String
@@ -36,17 +36,20 @@ model Event {
   date                     DateTime
   startTime                String
   endTime                  String
-  isFree                   Boolean       @default(true)
+  isFree                   Boolean             @default(true)
   amount                   Float?
   earlyBirdAmount          Float?
-  isEarlyBird              Boolean       @default(false)
-  status                   EventStatus   @default(ANNOUNCED)
+  isEarlyBird              Boolean             @default(false)
+  gstEnabled               Boolean             @default(false)
+  platformFeeEnabled       Boolean             @default(true)
+  status                   EventStatus         @default(ANNOUNCED)
   capacity                 Int?
-  featured                 Boolean       @default(false)
+  featured                 Boolean             @default(false)
   couponCodes              CouponCode[]
-  archivedParticipantCount Int           @default(0)
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
+  complimentaryCodes       ComplimentaryCode[]
+  archivedParticipantCount Int                 @default(0)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
   participants             Participant[]
 
   @@index([date])
@@ -63,6 +66,12 @@ enum EventStatus {
 type CouponCode {
   code     String
   discount Float
+}
+
+type ComplimentaryCode {
+  code      String
+  maxUses   Int
+  usedCount Int
 }
 
 model Participant {

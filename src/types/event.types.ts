@@ -1,6 +1,6 @@
-import type { Event, EventStatus, Participant, CouponCode } from "@prisma/client"
+import type { Event, EventStatus, Participant, CouponCode, ComplimentaryCode } from "@prisma/client"
 
-export type { CouponCode }
+export type { CouponCode, ComplimentaryCode }
 
 export type EventWithParticipantCount = Event & {
   _count: { participants: number }
@@ -26,6 +26,8 @@ export type PublicEvent = Pick<
   | "amount"
   | "capacity"
   | "featured"
+  | "gstEnabled"
+  | "platformFeeEnabled"
 > & {
   earlyBirdAmount: number | null
   isEarlyBird: boolean
@@ -52,7 +54,10 @@ export type CreateEventInput = {
   status: EventStatus
   capacity?: number | null
   featured: boolean
+  gstEnabled?: boolean
+  platformFeeEnabled?: boolean
   couponCodes?: CouponCode[]
+  complimentaryCodes?: ComplimentaryCode[]
 }
 
 export type UpdateEventInput = Partial<CreateEventInput>
