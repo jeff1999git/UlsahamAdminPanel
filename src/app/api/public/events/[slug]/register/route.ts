@@ -111,6 +111,7 @@ export async function POST(
       eventId: event.id,
       ...parsed.data,
       email: parsed.data.email || null,
+      amountPaid: true,
     })
 
     if (complimentaryCode) {
