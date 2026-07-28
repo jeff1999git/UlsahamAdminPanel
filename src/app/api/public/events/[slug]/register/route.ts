@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { registerRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { participantSchema } from "@/validators/participant.validator"
-import { getPublishedEventBySlug } from "@/services/event.service"
+import { getPublishedEventBySlug, findEventComplimentaryCodes, incrementComplimentaryCodeUsage } from "@/services/event.service"
 import { countParticipantsForEvent, findParticipantByEventAndPhone } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
+
+const registerBodySchema = participantSchema.extend({
+  code: z.string().max(50).optional(),
+})
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request)
@@ -38,7 +43,7 @@ export async function POST(
     )
   }
 
-  const parsed = participantSchema.safeParse(body)
+  const parsed = registerBodySchema.safeParse(body)
   if (!parsed.success) {
     const fieldErrors = parsed.error.flatten().fieldErrors
     return NextResponse.json(
@@ -61,11 +66,27 @@ export async function POST(
       )
     }
 
+    let complimentaryCode: string | undefined
+
     if (!event.isFree) {
-      return NextResponse.json(
-        { success: false, error: "This is a paid event — use the payment endpoint" },
-        { status: 400, headers: corsHeaders }
+      if (!parsed.data.code) {
+        return NextResponse.json(
+          { success: false, error: "This is a paid event — use the payment endpoint" },
+          { status: 400, headers: corsHeaders }
+        )
+      }
+
+      const complimentaryCodes = await findEventComplimentaryCodes(event.id)
+      const match = complimentaryCodes.find(
+        (c) => c.code.toUpperCase() === parsed.data.code!.toUpperCase()
       )
+      if (!match || match.maxUses - match.usedCount <= 0) {
+        return NextResponse.json(
+          { success: false, error: "Invalid or fully-used code" },
+          { status: 400, headers: corsHeaders }
+        )
+      }
+      complimentaryCode = match.code
     }
 
     const existingParticipant = await findParticipantByEventAndPhone(event.id, parsed.data.phone)
@@ -91,6 +112,10 @@ export async function POST(
       ...parsed.data,
       email: parsed.data.email || null,
     })
+
+    if (complimentaryCode) {
+      await incrementComplimentaryCodeUsage(event.id, complimentaryCode)
+    }
 
     return NextResponse.json(
       {
