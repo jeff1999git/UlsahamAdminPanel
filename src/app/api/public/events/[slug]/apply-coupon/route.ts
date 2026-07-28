@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { couponValidateRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
-import { getPublishedEventBySlug, findEventCoupons } from "@/services/event.service"
+import { getPublishedEventBySlug, findEventCoupons, findEventComplimentaryCodes } from "@/services/event.service"
 
 const bodySchema = z.object({
   couponCode: z.string().min(1, "Coupon code is required").max(50),
@@ -64,29 +64,47 @@ export async function POST(
       )
     }
 
-    const coupons = await findEventCoupons(event.id)
-    const coupon = coupons.find(
-      (c) => c.code.toUpperCase() === parsed.data.couponCode.toUpperCase()
-    )
+    const codeInput = parsed.data.couponCode.toUpperCase()
 
-    if (!coupon) {
+    const coupons = await findEventCoupons(event.id)
+    const coupon = coupons.find((c) => c.code.toUpperCase() === codeInput)
+
+    if (coupon) {
+      // Discount must be less than the per-person ticket price so the base never reaches zero
+      if (coupon.discount >= event.effectiveAmount!) {
+        return NextResponse.json(
+          { success: false, error: "This coupon code is not valid for this event" },
+          { status: 400, headers: corsHeaders }
+        )
+      }
+
       return NextResponse.json(
-        { success: false, error: "Invalid coupon code" },
-        { status: 404, headers: corsHeaders }
+        { success: true, data: { type: "coupon", couponCode: coupon.code, discount: coupon.discount } },
+        { headers: corsHeaders }
       )
     }
 
-    // Discount must be less than the per-person ticket price so the base never reaches zero
-    if (coupon.discount >= event.effectiveAmount!) {
+    const complimentaryCodes = await findEventComplimentaryCodes(event.id)
+    const complimentary = complimentaryCodes.find((c) => c.code.toUpperCase() === codeInput)
+
+    if (complimentary) {
+      const remainingUses = complimentary.maxUses - complimentary.usedCount
+      if (remainingUses <= 0) {
+        return NextResponse.json(
+          { success: false, error: "This code has no remaining entries." },
+          { status: 400, headers: corsHeaders }
+        )
+      }
+
       return NextResponse.json(
-        { success: false, error: "This coupon code is not valid for this event" },
-        { status: 400, headers: corsHeaders }
+        { success: true, data: { type: "complimentary", couponCode: complimentary.code, remainingUses } },
+        { headers: corsHeaders }
       )
     }
 
     return NextResponse.json(
-      { success: true, data: { couponCode: coupon.code, discount: coupon.discount } },
-      { headers: corsHeaders }
+      { success: false, error: "Invalid coupon code" },
+      { status: 404, headers: corsHeaders }
     )
   } catch (error) {
     console.error("Apply coupon error:", error)
