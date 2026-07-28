@@ -1,6 +1,18 @@
 import { z } from "zod"
 import { EventStatus } from "@prisma/client"
 
+const complimentaryCodeSchema = z.object({
+  code: z
+    .string()
+    .min(1, "Code is required")
+    .max(50, "Code must be at most 50 characters")
+    .transform((v) => v.toUpperCase()),
+  maxUses: z.coerce.number().int().positive("Max uses must be a positive number"),
+  usedCount: z.coerce.number().int().min(0).default(0),
+})
+
+export type ComplimentaryCodeFormValue = z.infer<typeof complimentaryCodeSchema>
+
 const couponCodeSchema = z.object({
   code: z
     .string()
@@ -52,7 +64,9 @@ const baseEventSchema = z.object({
   status: z.nativeEnum(EventStatus).default(EventStatus.ANNOUNCED),
   capacity: z.coerce.number().int().positive("Capacity must be a positive integer").optional().nullable(),
   featured: z.boolean().default(false),
+  gstEnabled: z.boolean().default(false),
   couponCodes: z.array(couponCodeSchema).optional(),
+  complimentaryCodes: z.array(complimentaryCodeSchema).optional(),
 })
 
 export const createEventSchema = baseEventSchema

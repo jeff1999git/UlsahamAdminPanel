@@ -63,28 +63,34 @@ export function EventForm({ event }: EventFormProps) {
 
   const [newCouponCode, setNewCouponCode] = useState("")
   const [newCouponDiscount, setNewCouponDiscount] = useState("")
+  const [newCompCode, setNewCompCode] = useState("")
+  const [newCompMaxUses, setNewCompMaxUses] = useState("")
+
+  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
 
   const form = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventSchema),
     defaultValues: {
-      name: event?.name ?? "",
-      slug: event?.slug ?? "",
-      description: event?.description ?? "",
-      bannerImageUrl: event?.bannerImageUrl ?? "",
-      bannerImageId: event?.bannerImageId ?? "",
-      venue: event?.venue ?? "",
-      venueLink: event?.venueLink ?? "",
-      date: event?.date ? new Date(event.date) : new Date(),
-      startTime: event?.startTime ?? "10:00 AM",
-      endTime: event?.endTime ?? "05:00 PM",
-      isFree: event?.isFree ?? true,
-      amount: event?.amount ?? undefined,
-      earlyBirdAmount: (event as { earlyBirdAmount?: number | null } | undefined)?.earlyBirdAmount ?? undefined,
-      isEarlyBird: (event as { isEarlyBird?: boolean } | undefined)?.isEarlyBird ?? false,
-      status: event?.status ?? "ANNOUNCED",
-      capacity: event?.capacity ?? undefined,
-      featured: event?.featured ?? false,
-      couponCodes: event?.couponCodes ?? [],
+      name: ev?.name ?? "",
+      slug: ev?.slug ?? "",
+      description: ev?.description ?? "",
+      bannerImageUrl: ev?.bannerImageUrl ?? "",
+      bannerImageId: ev?.bannerImageId ?? "",
+      venue: ev?.venue ?? "",
+      venueLink: ev?.venueLink ?? "",
+      date: ev?.date ? new Date(ev.date) : new Date(),
+      startTime: ev?.startTime ?? "10:00 AM",
+      endTime: ev?.endTime ?? "05:00 PM",
+      isFree: ev?.isFree ?? true,
+      amount: ev?.amount ?? undefined,
+      earlyBirdAmount: ev?.earlyBirdAmount ?? undefined,
+      isEarlyBird: ev?.isEarlyBird ?? false,
+      gstEnabled: ev?.gstEnabled ?? false,
+      status: ev?.status ?? "ANNOUNCED",
+      capacity: ev?.capacity ?? undefined,
+      featured: ev?.featured ?? false,
+      couponCodes: ev?.couponCodes ?? [],
+      complimentaryCodes: ev?.complimentaryCodes ?? [],
     },
   })
 
@@ -96,6 +102,22 @@ export function EventForm({ event }: EventFormProps) {
     control: form.control,
     name: "couponCodes",
   })
+
+  const { fields: compFields, append: appendComp, remove: removeComp } = useFieldArray({
+    control: form.control,
+    name: "complimentaryCodes",
+  })
+
+  function handleAddComp() {
+    const code = newCompCode.trim().toUpperCase()
+    const maxUses = parseInt(newCompMaxUses)
+    if (!code) { toast.error("Enter a complimentary code"); return }
+    if (!maxUses || maxUses <= 0) { toast.error("Enter a valid number of entries"); return }
+    if (compFields.some((f) => f.code === code)) { toast.error("This code already exists"); return }
+    appendComp({ code, maxUses, usedCount: 0 })
+    setNewCompCode("")
+    setNewCompMaxUses("")
+  }
 
   function handleAddCoupon() {
     const code = newCouponCode.trim().toUpperCase()
@@ -400,6 +422,24 @@ export function EventForm({ event }: EventFormProps) {
                         )}
                       />
                     )}
+
+                    <FormField
+                      control={form.control}
+                      name="gstEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-md border px-3 py-2">
+                          <div>
+                            <FormLabel>Apply GST (18%)</FormLabel>
+                            <FormDescription>
+                              Add 18% GST on top of the ticket price
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </>
                 )}
 
@@ -428,6 +468,7 @@ export function EventForm({ event }: EventFormProps) {
                 />
 
                 {!isFree && (
+                  <>
                   <div className="space-y-3 pt-2 border-t">
                     <div>
                       <p className="text-sm font-medium">Coupon Codes</p>
@@ -505,6 +546,74 @@ export function EventForm({ event }: EventFormProps) {
                       </Button>
                     </div>
                   </div>
+
+                  <div className="space-y-3 pt-3 border-t">
+                    <div>
+                      <p className="text-sm font-medium">Complimentary Codes</p>
+                      <p className="text-sm text-muted-foreground">
+                        Each code grants one free entry — no payment required
+                      </p>
+                    </div>
+
+                    {compFields.length > 0 && (
+                      <div className="space-y-2">
+                        {compFields.map((field, index) => (
+                          <div key={field.id} className="flex items-center gap-2">
+                            <div className="flex-1 flex items-center gap-2 rounded-md border px-3 py-2 bg-muted/30">
+                              <span className="font-mono text-sm font-medium tracking-wide">
+                                {field.code}
+                              </span>
+                              <span className="text-muted-foreground text-sm">—</span>
+                              <span className="text-sm">{field.maxUses} {field.maxUses === 1 ? "entry" : "entries"} ({field.usedCount} used)</span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0 text-destructive hover:text-destructive"
+                              onClick={() => removeComp(index)}
+                              disabled={isSubmitting}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="CODE"
+                        className="flex-1 font-mono uppercase"
+                        value={newCompCode}
+                        onChange={(e) => setNewCompCode(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddComp() } }}
+                        disabled={isSubmitting}
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Entries"
+                        className="w-28"
+                        min="1"
+                        value={newCompMaxUses}
+                        onChange={(e) => setNewCompMaxUses(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddComp() } }}
+                        disabled={isSubmitting}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddComp}
+                        disabled={isSubmitting}
+                        className="shrink-0"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>

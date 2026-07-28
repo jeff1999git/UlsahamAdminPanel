@@ -119,6 +119,29 @@ export async function findEventCoupons(eventId: string) {
   return event?.couponCodes ?? []
 }
 
+export async function findEventComplimentaryCodes(eventId: string) {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { complimentaryCodes: true },
+  })
+  return event?.complimentaryCodes ?? []
+}
+
+export async function incrementComplimentaryCodeUsage(eventId: string, code: string) {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { complimentaryCodes: true },
+  })
+  if (!event) return
+  const updated = event.complimentaryCodes.map((c) =>
+    c.code.toUpperCase() === code.toUpperCase() ? { ...c, usedCount: c.usedCount + 1 } : c
+  )
+  return prisma.event.update({
+    where: { id: eventId },
+    data: { complimentaryCodes: { set: updated } },
+  })
+}
+
 export async function createEvent(data: Prisma.EventCreateInput) {
   return prisma.event.create({ data })
 }
