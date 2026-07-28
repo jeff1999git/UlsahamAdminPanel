@@ -91,7 +91,7 @@ export async function POST(
     }
 
     const quantity = parsed.data.numberOfParticipants
-    const breakdown = calculateTicketFees(event.effectiveAmount, quantity, couponDiscount, event.gstEnabled)
+    const breakdown = calculateTicketFees(event.effectiveAmount, quantity, couponDiscount, event.gstEnabled, event.platformFeeEnabled)
     const totalAmountPaise = Math.round(breakdown.total * 100)
 
     const keyId = process.env.RAZORPAY_KEY_ID

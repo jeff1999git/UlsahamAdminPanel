@@ -27,6 +27,7 @@ export type PublicEvent = Pick<
   | "capacity"
   | "featured"
   | "gstEnabled"
+  | "platformFeeEnabled"
 > & {
   earlyBirdAmount: number | null
   isEarlyBird: boolean
@@ -54,6 +55,7 @@ export type CreateEventInput = {
   capacity?: number | null
   featured: boolean
   gstEnabled?: boolean
+  platformFeeEnabled?: boolean
   couponCodes?: CouponCode[]
   complimentaryCodes?: ComplimentaryCode[]
 }

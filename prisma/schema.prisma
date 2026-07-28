@@ -41,6 +41,7 @@ model Event {
   earlyBirdAmount          Float?
   isEarlyBird              Boolean             @default(false)
   gstEnabled               Boolean             @default(false)
+  platformFeeEnabled       Boolean             @default(true)
   status                   EventStatus         @default(ANNOUNCED)
   capacity                 Int?
   featured                 Boolean             @default(false)

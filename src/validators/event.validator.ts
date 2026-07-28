@@ -65,6 +65,7 @@ const baseEventSchema = z.object({
   capacity: z.coerce.number().int().positive("Capacity must be a positive integer").optional().nullable(),
   featured: z.boolean().default(false),
   gstEnabled: z.boolean().default(false),
+  platformFeeEnabled: z.boolean().default(true),
   couponCodes: z.array(couponCodeSchema).optional(),
   complimentaryCodes: z.array(complimentaryCodeSchema).optional(),
 })

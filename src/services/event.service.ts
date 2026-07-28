@@ -106,6 +106,7 @@ export async function createNewEvent(input: CreateEventInput) {
     earlyBirdAmount: input.isFree ? null : (input.earlyBirdAmount ?? null),
     isEarlyBird: input.isFree ? false : (input.isEarlyBird ?? false),
     gstEnabled: input.isFree ? false : (input.gstEnabled ?? false),
+    platformFeeEnabled: input.isFree ? true : (input.platformFeeEnabled ?? true),
     status: input.status,
     capacity: input.capacity ?? null,
     featured: input.featured,
@@ -134,6 +135,7 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.couponCodes !== undefined) updateData.couponCodes = { set: input.couponCodes }
   if (input.complimentaryCodes !== undefined) updateData.complimentaryCodes = { set: input.complimentaryCodes }
   if (input.gstEnabled !== undefined) updateData.gstEnabled = input.gstEnabled
+  if (input.platformFeeEnabled !== undefined) updateData.platformFeeEnabled = input.platformFeeEnabled
   if (input.earlyBirdAmount !== undefined) updateData.earlyBirdAmount = input.earlyBirdAmount ?? null
   if (input.isEarlyBird !== undefined) updateData.isEarlyBird = input.isEarlyBird
 
@@ -144,6 +146,7 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
       updateData.earlyBirdAmount = null
       updateData.isEarlyBird = false
       updateData.gstEnabled = false
+      updateData.platformFeeEnabled = true
       updateData.couponCodes = { set: [] }
       updateData.complimentaryCodes = { set: [] }
     }

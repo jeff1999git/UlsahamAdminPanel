@@ -66,7 +66,7 @@ export function EventForm({ event }: EventFormProps) {
   const [newCompCode, setNewCompCode] = useState("")
   const [newCompMaxUses, setNewCompMaxUses] = useState("")
 
-  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
+  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
 
   const form = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventSchema),
@@ -86,6 +86,7 @@ export function EventForm({ event }: EventFormProps) {
       earlyBirdAmount: ev?.earlyBirdAmount ?? undefined,
       isEarlyBird: ev?.isEarlyBird ?? false,
       gstEnabled: ev?.gstEnabled ?? false,
+      platformFeeEnabled: ev?.platformFeeEnabled ?? true,
       status: ev?.status ?? "ANNOUNCED",
       capacity: ev?.capacity ?? undefined,
       featured: ev?.featured ?? false,
@@ -432,6 +433,24 @@ export function EventForm({ event }: EventFormProps) {
                             <FormLabel>Apply GST (18%)</FormLabel>
                             <FormDescription>
                               Add 18% GST on top of the ticket price
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="platformFeeEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-md border px-3 py-2">
+                          <div>
+                            <FormLabel>Apply Platform Fee (2%)</FormLabel>
+                            <FormDescription>
+                              Add 2% platform fee on top of the ticket price
                             </FormDescription>
                           </div>
                           <FormControl>

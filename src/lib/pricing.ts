@@ -5,13 +5,14 @@ export function calculateTicketFees(
   baseAmountPerPerson: number,
   quantity: number,
   couponDiscount = 0,
-  gstEnabled = true
+  gstEnabled = true,
+  platformFeeEnabled = true
 ) {
   const base = baseAmountPerPerson * quantity
   const discountApplied = Math.min(couponDiscount, base)
   const discountedBase = Math.max(0, base - discountApplied)
   const gst = gstEnabled ? Math.round(discountedBase * GST_RATE * 100) / 100 : 0
-  const platformFee = Math.round(discountedBase * PLATFORM_FEE_RATE * 100) / 100
+  const platformFee = platformFeeEnabled ? Math.round(discountedBase * PLATFORM_FEE_RATE * 100) / 100 : 0
   const total = Math.round((discountedBase + gst + platformFee) * 100) / 100
   return { base, discount: discountApplied, discountedBase, gst, platformFee, total }
 }
