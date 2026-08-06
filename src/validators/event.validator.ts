@@ -73,6 +73,14 @@ const baseEventSchema = z.object({
     .positive("Extra member amount must be positive")
     .optional()
     .nullable(),
+  competitionInstructions: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().max(10000, "Instructions must be at most 10000 characters").optional().nullable()
+  ),
+  competitionNotes: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().max(5000, "Notes must be at most 5000 characters").optional().nullable()
+  ),
   couponCodes: z.array(couponCodeSchema).optional(),
   complimentaryCodes: z.array(complimentaryCodeSchema).optional(),
 })

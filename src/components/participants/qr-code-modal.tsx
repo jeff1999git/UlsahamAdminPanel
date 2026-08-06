@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { downloadParticipationCardPdf } from "@/lib/participation-card-pdf"
 
 const QRCode = dynamic(() => import("react-qr-code"), {
   ssr: false,
@@ -27,6 +28,8 @@ interface QRCodeModalProps {
   eventVenue: string
   numberOfParticipants: number
   competitionNumber?: number | null
+  competitionInstructions?: string | null
+  competitionNotes?: string | null
   bannerImageUrl?: string | null
   fullWidth?: boolean
 }
@@ -315,6 +318,8 @@ export function QRCodeModal({
   eventVenue,
   numberOfParticipants,
   competitionNumber,
+  competitionInstructions,
+  competitionNotes,
   bannerImageUrl,
   fullWidth = false,
 }: QRCodeModalProps) {
@@ -342,17 +347,28 @@ export function QRCodeModal({
         competitionNumber,
         bannerImageUrl,
       })
-      canvas.toBlob((blob) => {
-        if (!blob) return
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = isEntryCard ? `participation-card-${ticketCode}.png` : `ticket-${ticketCode}.png`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }, "image/png")
+      const hasExtras = !!(competitionInstructions?.trim() || competitionNotes?.trim())
+      if (isEntryCard && hasExtras) {
+        // Card + instructions/notes bundled as a PDF
+        downloadParticipationCardPdf(canvas, {
+          eventName,
+          instructions: competitionInstructions,
+          notes: competitionNotes,
+          filename: `participation-card-${ticketCode}.pdf`,
+        })
+      } else {
+        canvas.toBlob((blob) => {
+          if (!blob) return
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = isEntryCard ? `participation-card-${ticketCode}.png` : `ticket-${ticketCode}.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+        }, "image/png")
+      }
     } catch {
       toast.error(isEntryCard ? "Failed to generate participation card" : "Failed to generate ticket")
     } finally {

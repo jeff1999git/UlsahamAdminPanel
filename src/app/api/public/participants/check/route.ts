@@ -52,6 +52,8 @@ export async function GET(request: NextRequest) {
           numberOfParticipants: participant.numberOfParticipants,
           attended: participant.attended,
           registeredAt: participant.registeredAt,
+          competitionNumber: participant.competitionNumber,
+          isGroupRegistration: participant.isGroupRegistration,
         },
       },
       { headers: corsHeaders }

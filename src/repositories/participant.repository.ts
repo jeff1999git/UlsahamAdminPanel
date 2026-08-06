@@ -26,7 +26,7 @@ export async function findParticipantsByTicketCodes(ticketCodes: string[]) {
     where: { ticketCode: { in: ticketCodes } },
     include: {
       event: {
-        select: { id: true, name: true, slug: true, date: true, venue: true, bannerImageUrl: true },
+        select: { id: true, name: true, slug: true, date: true, venue: true, bannerImageUrl: true, isCompetition: true, competitionInstructions: true, competitionNotes: true },
       },
     },
   })

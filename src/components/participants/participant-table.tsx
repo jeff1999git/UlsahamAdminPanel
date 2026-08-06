@@ -60,6 +60,8 @@ interface ParticipantTableProps {
   eventDate: string
   eventVenue: string
   eventBannerUrl?: string | null
+  competitionInstructions?: string | null
+  competitionNotes?: string | null
   isSuperAdmin: boolean
 }
 
@@ -71,6 +73,8 @@ export function ParticipantTable({
   eventDate,
   eventVenue,
   eventBannerUrl,
+  competitionInstructions,
+  competitionNotes,
   isSuperAdmin,
 }: ParticipantTableProps) {
   const [, startTransition] = useTransition()
@@ -361,6 +365,8 @@ export function ParticipantTable({
                             eventVenue={eventVenue}
                             numberOfParticipants={p.numberOfParticipants}
                             competitionNumber={p.competitionNumber}
+                            competitionInstructions={competitionInstructions}
+                            competitionNotes={competitionNotes}
                             bannerImageUrl={eventBannerUrl}
                           />
                         ) : (
@@ -526,6 +532,8 @@ export function ParticipantTable({
                     eventVenue={eventVenue}
                     numberOfParticipants={selectedMobile.numberOfParticipants}
                     competitionNumber={selectedMobile.competitionNumber}
+                    competitionInstructions={competitionInstructions}
+                    competitionNotes={competitionNotes}
                     bannerImageUrl={eventBannerUrl}
                     fullWidth
                   />

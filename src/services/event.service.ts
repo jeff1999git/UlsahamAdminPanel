@@ -88,6 +88,10 @@ export async function createNewEvent(input: CreateEventInput) {
     isCompetition && !input.isFree && participationType !== "INDIVIDUAL"
       ? (input.groupExtraAmount ?? null)
       : null
+  const competitionInstructions =
+    isCompetition && input.competitionInstructions ? sanitizeString(input.competitionInstructions) : null
+  const competitionNotes =
+    isCompetition && input.competitionNotes ? sanitizeString(input.competitionNotes) : null
 
   // Try base slug, then append a short timestamp suffix on collision
   let slug = baseSlug
@@ -117,6 +121,8 @@ export async function createNewEvent(input: CreateEventInput) {
     isCompetition,
     participationType,
     groupExtraAmount,
+    competitionInstructions,
+    competitionNotes,
     status: input.status,
     capacity: input.capacity ?? null,
     featured: input.featured,
@@ -156,11 +162,22 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
     updateData.groupExtraAmount = input.groupExtraAmount ?? null
   }
 
+  if (input.competitionInstructions !== undefined) {
+    updateData.competitionInstructions = input.competitionInstructions
+      ? sanitizeString(input.competitionInstructions)
+      : null
+  }
+  if (input.competitionNotes !== undefined) {
+    updateData.competitionNotes = input.competitionNotes ? sanitizeString(input.competitionNotes) : null
+  }
+
   if (input.isCompetition !== undefined) {
     updateData.isCompetition = input.isCompetition
     if (!input.isCompetition) {
       updateData.participationType = "INDIVIDUAL"
       updateData.groupExtraAmount = null
+      updateData.competitionInstructions = null
+      updateData.competitionNotes = null
     }
   }
 

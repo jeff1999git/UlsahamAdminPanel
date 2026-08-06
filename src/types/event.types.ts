@@ -31,6 +31,8 @@ export type PublicEvent = Pick<
   | "isCompetition"
   | "participationType"
   | "groupExtraAmount"
+  | "competitionInstructions"
+  | "competitionNotes"
 > & {
   earlyBirdAmount: number | null
   isEarlyBird: boolean
@@ -62,6 +64,8 @@ export type CreateEventInput = {
   isCompetition?: boolean
   participationType?: ParticipationType
   groupExtraAmount?: number | null
+  competitionInstructions?: string | null
+  competitionNotes?: string | null
   couponCodes?: CouponCode[]
   complimentaryCodes?: ComplimentaryCode[]
 }

@@ -66,7 +66,7 @@ export function EventForm({ event }: EventFormProps) {
   const [newCompCode, setNewCompCode] = useState("")
   const [newCompMaxUses, setNewCompMaxUses] = useState("")
 
-  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; isCompetition?: boolean; participationType?: "INDIVIDUAL" | "GROUP" | "BOTH"; groupExtraAmount?: number | null; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
+  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; isCompetition?: boolean; participationType?: "INDIVIDUAL" | "GROUP" | "BOTH"; groupExtraAmount?: number | null; competitionInstructions?: string | null; competitionNotes?: string | null; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
 
   const form = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventSchema),
@@ -90,6 +90,8 @@ export function EventForm({ event }: EventFormProps) {
       isCompetition: ev?.isCompetition ?? false,
       participationType: ev?.participationType ?? "INDIVIDUAL",
       groupExtraAmount: ev?.groupExtraAmount ?? undefined,
+      competitionInstructions: ev?.competitionInstructions ?? "",
+      competitionNotes: ev?.competitionNotes ?? "",
       status: ev?.status ?? "ANNOUNCED",
       capacity: ev?.capacity ?? undefined,
       featured: ev?.featured ?? false,
@@ -385,6 +387,50 @@ export function EventForm({ event }: EventFormProps) {
                       </FormItem>
                     )}
                   />
+                )}
+
+                {isCompetition && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="competitionNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Shown to participants before they register (e.g. eligibility, judging criteria, timing)..."
+                              className="min-h-[80px]"
+                              {...field}
+                              value={field.value ?? ""}
+                            />
+                          </FormControl>
+                          <FormDescription>Optional — displayed on the event page before registration</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="competitionInstructions"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Instructions</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Detailed rules & instructions for participants..."
+                              className="min-h-[120px]"
+                              {...field}
+                              value={field.value ?? ""}
+                            />
+                          </FormControl>
+                          <FormDescription>Optional — included in the participation card PDF download</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
                 )}
               </CardContent>
             </Card>

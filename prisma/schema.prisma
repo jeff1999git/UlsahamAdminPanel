@@ -45,6 +45,8 @@ model Event {
   isCompetition            Boolean             @default(false)
   participationType        ParticipationType   @default(INDIVIDUAL)
   groupExtraAmount         Float?
+  competitionInstructions  String?
+  competitionNotes         String?
   lastCompetitionNumber    Int                 @default(0)
   status                   EventStatus         @default(ANNOUNCED)
   capacity                 Int?
