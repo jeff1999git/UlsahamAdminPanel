@@ -47,7 +47,7 @@ export async function getPublishedEventBySlug(slug: string) {
   const isFull = event.capacity !== null && registeredCount >= event.capacity
   const effectiveAmount = getEffectiveAmount(event)
 
-  const { _count, bannerImageId, couponCodes, complimentaryCodes, ...publicFields } = event
+  const { _count, bannerImageId, couponCodes, complimentaryCodes, lastCompetitionNumber, ...publicFields } = event
   return { ...publicFields, registeredCount, isFull, effectiveAmount }
 }
 
@@ -71,7 +71,7 @@ export async function getPublishedEvents(params: {
       const registeredCount = event._count.participants
       const isFull = event.capacity !== null && registeredCount >= event.capacity
       const effectiveAmount = getEffectiveAmount(event)
-      const { _count, couponCodes, complimentaryCodes, ...rest } = event
+      const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, ...rest } = event
       return { ...rest, registeredCount, isFull, effectiveAmount }
     })
   )
@@ -81,6 +81,17 @@ export async function getPublishedEvents(params: {
 
 export async function createNewEvent(input: CreateEventInput) {
   const baseSlug = input.slug || generateSlug(input.name)
+
+  const isCompetition = input.isCompetition ?? false
+  const participationType = isCompetition ? (input.participationType ?? "INDIVIDUAL") : "INDIVIDUAL"
+  const groupExtraAmount =
+    isCompetition && !input.isFree && participationType !== "INDIVIDUAL"
+      ? (input.groupExtraAmount ?? null)
+      : null
+  const competitionInstructions =
+    isCompetition && input.competitionInstructions ? sanitizeString(input.competitionInstructions) : null
+  const competitionNotes =
+    isCompetition && input.competitionNotes ? sanitizeString(input.competitionNotes) : null
 
   // Try base slug, then append a short timestamp suffix on collision
   let slug = baseSlug
@@ -107,6 +118,11 @@ export async function createNewEvent(input: CreateEventInput) {
     isEarlyBird: input.isFree ? false : (input.isEarlyBird ?? false),
     gstEnabled: input.isFree ? false : (input.gstEnabled ?? false),
     platformFeeEnabled: input.isFree ? true : (input.platformFeeEnabled ?? true),
+    isCompetition,
+    participationType,
+    groupExtraAmount,
+    competitionInstructions,
+    competitionNotes,
     status: input.status,
     capacity: input.capacity ?? null,
     featured: input.featured,
@@ -138,6 +154,32 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.platformFeeEnabled !== undefined) updateData.platformFeeEnabled = input.platformFeeEnabled
   if (input.earlyBirdAmount !== undefined) updateData.earlyBirdAmount = input.earlyBirdAmount ?? null
   if (input.isEarlyBird !== undefined) updateData.isEarlyBird = input.isEarlyBird
+  if (input.participationType !== undefined) {
+    updateData.participationType = input.participationType
+    if (input.participationType === "INDIVIDUAL") updateData.groupExtraAmount = null
+  }
+  if (input.groupExtraAmount !== undefined && updateData.groupExtraAmount === undefined) {
+    updateData.groupExtraAmount = input.groupExtraAmount ?? null
+  }
+
+  if (input.competitionInstructions !== undefined) {
+    updateData.competitionInstructions = input.competitionInstructions
+      ? sanitizeString(input.competitionInstructions)
+      : null
+  }
+  if (input.competitionNotes !== undefined) {
+    updateData.competitionNotes = input.competitionNotes ? sanitizeString(input.competitionNotes) : null
+  }
+
+  if (input.isCompetition !== undefined) {
+    updateData.isCompetition = input.isCompetition
+    if (!input.isCompetition) {
+      updateData.participationType = "INDIVIDUAL"
+      updateData.groupExtraAmount = null
+      updateData.competitionInstructions = null
+      updateData.competitionNotes = null
+    }
+  }
 
   if (input.isFree !== undefined) {
     updateData.isFree = input.isFree
@@ -147,6 +189,7 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
       updateData.isEarlyBird = false
       updateData.gstEnabled = false
       updateData.platformFeeEnabled = true
+      updateData.groupExtraAmount = null
       updateData.couponCodes = { set: [] }
       updateData.complimentaryCodes = { set: [] }
     }

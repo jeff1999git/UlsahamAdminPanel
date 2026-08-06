@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       amountPaid: p.amountPaid,
       attended: p.attended,
       registeredAt: p.registeredAt,
+      competitionNumber: p.competitionNumber,
+      isGroupRegistration: p.isGroupRegistration,
       event: {
         id: p.event.id,
         name: p.event.name,
@@ -65,6 +67,9 @@ export async function POST(request: NextRequest) {
         date: p.event.date,
         venue: p.event.venue,
         bannerImageUrl: p.event.bannerImageUrl,
+        isCompetition: p.event.isCompetition,
+        competitionInstructions: p.event.competitionInstructions,
+        competitionNotes: p.event.competitionNotes,
       },
     }))
 

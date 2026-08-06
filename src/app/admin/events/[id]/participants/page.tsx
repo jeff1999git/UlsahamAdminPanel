@@ -64,6 +64,8 @@ export default async function ParticipantsPage({ params }: Props) {
         eventDate={formatDate(event.date)}
         eventVenue={event.venue}
         eventBannerUrl={event.bannerImageUrl}
+        competitionInstructions={event.competitionInstructions}
+        competitionNotes={event.competitionNotes}
         isSuperAdmin={role === "SUPER_ADMIN"}
       />
     </div>

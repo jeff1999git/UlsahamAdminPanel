@@ -142,6 +142,15 @@ export async function incrementComplimentaryCodeUsage(eventId: string, code: str
   })
 }
 
+export async function allocateCompetitionNumber(eventId: string) {
+  const updated = await prisma.event.update({
+    where: { id: eventId },
+    data: { lastCompetitionNumber: { increment: 1 } },
+    select: { lastCompetitionNumber: true },
+  })
+  return updated.lastCompetitionNumber
+}
+
 export async function createEvent(data: Prisma.EventCreateInput) {
   return prisma.event.create({ data })
 }

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { EventStatus } from "@prisma/client"
+import { EventStatus, ParticipationType } from "@prisma/client"
 
 const complimentaryCodeSchema = z.object({
   code: z
@@ -66,6 +66,21 @@ const baseEventSchema = z.object({
   featured: z.boolean().default(false),
   gstEnabled: z.boolean().default(false),
   platformFeeEnabled: z.boolean().default(true),
+  isCompetition: z.boolean().default(false),
+  participationType: z.nativeEnum(ParticipationType).default(ParticipationType.INDIVIDUAL),
+  groupExtraAmount: z.coerce
+    .number()
+    .positive("Extra member amount must be positive")
+    .optional()
+    .nullable(),
+  competitionInstructions: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().max(10000, "Instructions must be at most 10000 characters").optional().nullable()
+  ),
+  competitionNotes: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().max(5000, "Notes must be at most 5000 characters").optional().nullable()
+  ),
   couponCodes: z.array(couponCodeSchema).optional(),
   complimentaryCodes: z.array(complimentaryCodeSchema).optional(),
 })
@@ -95,6 +110,23 @@ export const createEventSchema = baseEventSchema
       path: ["date"],
     }
   )
+  .refine(
+    (data) => {
+      if (
+        data.isCompetition &&
+        !data.isFree &&
+        data.participationType !== ParticipationType.INDIVIDUAL &&
+        (data.groupExtraAmount === undefined || data.groupExtraAmount === null)
+      ) {
+        return false
+      }
+      return true
+    },
+    {
+      message: "Extra member amount is required for paid group competitions",
+      path: ["groupExtraAmount"],
+    }
+  )
 
 export const updateEventSchema = baseEventSchema
   .partial()
@@ -109,6 +141,24 @@ export const updateEventSchema = baseEventSchema
     {
       message: "Amount is required for paid events",
       path: ["amount"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (
+        data.isCompetition === true &&
+        data.isFree === false &&
+        data.participationType !== undefined &&
+        data.participationType !== ParticipationType.INDIVIDUAL &&
+        (data.groupExtraAmount === undefined || data.groupExtraAmount === null)
+      ) {
+        return false
+      }
+      return true
+    },
+    {
+      message: "Extra member amount is required for paid group competitions",
+      path: ["groupExtraAmount"],
     }
   )
 

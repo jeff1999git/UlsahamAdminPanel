@@ -14,8 +14,9 @@ import {
   scanParticipantGlobal,
   addEnteredCount,
 } from "@/repositories/participant.repository"
-import { findEventById } from "@/repositories/event.repository"
+import { findEventById, allocateCompetitionNumber } from "@/repositories/event.repository"
 import { generateTicketCode } from "@/lib/ticket-code"
+import { validateCompetitionQuantity } from "@/lib/competition"
 import { sanitizeString } from "@/lib/utils"
 import type {
   CreateParticipantInput,
@@ -48,6 +49,9 @@ export async function registerParticipant(
   const existing = await findParticipantByEventAndPhone(input.eventId, input.phone)
   if (existing) throw new Error("Phone number already registered for this event")
 
+  const quantityError = validateCompetitionQuantity(event, input.numberOfParticipants)
+  if (quantityError) throw new Error(quantityError)
+
   if (event.capacity !== null) {
     const currentCount = await countParticipantsForEvent(input.eventId)
     if (currentCount + input.numberOfParticipants > event.capacity) {
@@ -57,6 +61,10 @@ export async function registerParticipant(
 
   const ticketCode = generateTicketCode(event.slug)
 
+  const competitionNumber = event.isCompetition
+    ? await allocateCompetitionNumber(event.id)
+    : null
+
   const participant = await createParticipant({
     event: { connect: { id: input.eventId } },
     name: sanitizeString(input.name),
@@ -65,6 +73,8 @@ export async function registerParticipant(
     age: input.age,
     numberOfParticipants: input.numberOfParticipants,
     ticketCode,
+    competitionNumber,
+    isGroupRegistration: event.isCompetition && input.numberOfParticipants > 1,
     ...(input.amountPaid !== undefined && { amountPaid: input.amountPaid }),
   })
 

@@ -66,7 +66,7 @@ export function EventForm({ event }: EventFormProps) {
   const [newCompCode, setNewCompCode] = useState("")
   const [newCompMaxUses, setNewCompMaxUses] = useState("")
 
-  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
+  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; isCompetition?: boolean; participationType?: "INDIVIDUAL" | "GROUP" | "BOTH"; groupExtraAmount?: number | null; competitionInstructions?: string | null; competitionNotes?: string | null; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
 
   const form = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventSchema),
@@ -87,6 +87,11 @@ export function EventForm({ event }: EventFormProps) {
       isEarlyBird: ev?.isEarlyBird ?? false,
       gstEnabled: ev?.gstEnabled ?? false,
       platformFeeEnabled: ev?.platformFeeEnabled ?? true,
+      isCompetition: ev?.isCompetition ?? false,
+      participationType: ev?.participationType ?? "INDIVIDUAL",
+      groupExtraAmount: ev?.groupExtraAmount ?? undefined,
+      competitionInstructions: ev?.competitionInstructions ?? "",
+      competitionNotes: ev?.competitionNotes ?? "",
       status: ev?.status ?? "ANNOUNCED",
       capacity: ev?.capacity ?? undefined,
       featured: ev?.featured ?? false,
@@ -96,6 +101,8 @@ export function EventForm({ event }: EventFormProps) {
   })
 
   const isFree = form.watch("isFree")
+  const isCompetition = form.watch("isCompetition")
+  const participationType = form.watch("participationType")
   const earlyBirdAmount = form.watch("earlyBirdAmount")
   const isSubmitting = form.formState.isSubmitting
 
@@ -332,6 +339,102 @@ export function EventForm({ event }: EventFormProps) {
               </CardContent>
             </Card>
 
+            {/* Competition */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Competition</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="isCompetition"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div>
+                        <FormLabel>Competition Event</FormLabel>
+                        <FormDescription>
+                          e.g. reel or dance contest — participants get a competition number card instead of a ticket
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {isCompetition && (
+                  <FormField
+                    control={form.control}
+                    name="participationType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Participation Type *</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select participation type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="INDIVIDUAL">Individual only</SelectItem>
+                            <SelectItem value="GROUP">Group only</SelectItem>
+                            <SelectItem value="BOTH">Individual & Group</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>Who can enter this competition</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {isCompetition && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="competitionNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Shown to participants before they register (e.g. eligibility, judging criteria, timing)..."
+                              className="min-h-[80px]"
+                              {...field}
+                              value={field.value ?? ""}
+                            />
+                          </FormControl>
+                          <FormDescription>Optional — displayed on the event page before registration</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="competitionInstructions"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Instructions</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Detailed rules & instructions for participants..."
+                              className="min-h-[120px]"
+                              {...field}
+                              value={field.value ?? ""}
+                            />
+                          </FormControl>
+                          <FormDescription>Optional — included in the participation card PDF download</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Pricing */}
             <Card>
               <CardHeader>
@@ -361,7 +464,9 @@ export function EventForm({ event }: EventFormProps) {
                       name="amount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Regular Price (₹) *</FormLabel>
+                          <FormLabel>
+                            {isCompetition ? "Registration Price (₹) *" : "Regular Price (₹) *"}
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -372,10 +477,45 @@ export function EventForm({ event }: EventFormProps) {
                               value={field.value ?? ""}
                             />
                           </FormControl>
+                          {isCompetition && participationType !== "INDIVIDUAL" && (
+                            <FormDescription>
+                              Price for an individual entry — for group entries this covers the first member
+                            </FormDescription>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    {isCompetition && participationType !== "INDIVIDUAL" && (
+                      <FormField
+                        control={form.control}
+                        name="groupExtraAmount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Extra Member Price (₹) *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="e.g. 50"
+                                min="0"
+                                step="0.01"
+                                {...field}
+                                value={field.value ?? ""}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  field.onChange(val ? parseFloat(val) : null)
+                                }}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Each additional group member adds this amount (e.g. individual ₹100, group of 3 = ₹100 + 2 × ₹50 = ₹200)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     <FormField
                       control={form.control}
