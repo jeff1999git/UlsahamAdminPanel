@@ -4,7 +4,8 @@ import crypto from "crypto"
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { getRazorpay } from "@/lib/razorpay"
-import { calculateTicketFees } from "@/lib/pricing"
+import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
+import { validateCompetitionQuantity } from "@/lib/competition"
 import { findEventById } from "@/repositories/event.repository"
 import {
   findParticipantByEventAndPhone,
@@ -63,6 +64,9 @@ export async function createPaymentOrderAction(
     const isRepayment = !!existing
     const quantity = isRepayment ? existing.numberOfParticipants : parsed.data.numberOfParticipants
 
+    const quantityError = validateCompetitionQuantity(event, quantity)
+    if (quantityError) return { success: false, error: quantityError }
+
     if (!isRepayment && event.capacity !== null) {
       const currentCount = await countParticipantsForEvent(eventId)
       if (currentCount + quantity > event.capacity) {
@@ -73,7 +77,11 @@ export async function createPaymentOrderAction(
     const keyId = process.env.RAZORPAY_KEY_ID
     if (!keyId) return { success: false, error: "Payment gateway not configured" }
 
-    const { total } = calculateTicketFees(event.amount, quantity)
+    const effectiveAmount =
+      event.isEarlyBird && event.earlyBirdAmount != null ? event.earlyBirdAmount : event.amount
+    const { total } = event.isCompetition
+      ? calculateCompetitionFees(effectiveAmount, event.groupExtraAmount, quantity, 0, event.gstEnabled, event.platformFeeEnabled)
+      : calculateTicketFees(effectiveAmount, quantity, 0, event.gstEnabled, event.platformFeeEnabled)
     const totalAmountPaise = Math.round(total * 100)
 
     const order = await getRazorpay().orders.create({

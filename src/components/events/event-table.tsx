@@ -245,10 +245,7 @@ export function EventTable({ events, isUser = false, isSuperAdmin = false }: Eve
       {/* Enroll dialog for USER role */}
       {isUser && (
         <EnrollDialog
-          eventId={enrollEvent?.id ?? ""}
-          eventName={enrollEvent?.name ?? ""}
-          isFree={enrollEvent?.isFree ?? true}
-          amount={enrollEvent?.amount ?? null}
+          event={enrollEvent}
           open={!!enrollEvent}
           onOpenChange={(open) => { if (!open) setEnrollEvent(null) }}
           onEnrolled={() => handleEnrolled(enrollEvent?.id ?? "")}
