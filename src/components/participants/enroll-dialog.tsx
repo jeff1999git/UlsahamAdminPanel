@@ -34,13 +34,11 @@ import { Separator } from "@/components/ui/separator"
 import { participantSchema, type ParticipantFormValues } from "@/validators/participant.validator"
 import { addParticipantAction } from "@/actions/participant.actions"
 import { createPaymentOrderAction, verifyAndEnrollAction } from "@/actions/payment.actions"
-import { calculateTicketFees } from "@/lib/pricing"
+import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
+import type { Event } from "@prisma/client"
 
 interface EnrollDialogProps {
-  eventId: string
-  eventName: string
-  isFree: boolean
-  amount: number | null
+  event: Event | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onEnrolled?: () => void
@@ -61,15 +59,26 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export function EnrollDialog({
-  eventId,
-  eventName,
-  isFree,
-  amount,
+  event,
   open,
   onOpenChange,
   onEnrolled,
 }: EnrollDialogProps) {
   const [step, setStep] = useState<"form" | "success">("form")
+
+  const eventId = event?.id ?? ""
+  const eventName = event?.name ?? ""
+  const isFree = event?.isFree ?? true
+  const isCompetition = !!event?.isCompetition
+  const participationType = event?.participationType ?? "INDIVIDUAL"
+  const individualOnly = isCompetition && participationType === "INDIVIDUAL"
+  const groupOnly = isCompetition && participationType === "GROUP"
+  const effectiveAmount = event
+    ? event.isEarlyBird && event.earlyBirdAmount != null
+      ? event.earlyBirdAmount
+      : event.amount
+    : null
+  const extraMemberPrice = event?.groupExtraAmount ?? effectiveAmount
 
   const form = useForm<ParticipantFormValues>({
     resolver: zodResolver(participantSchema),
@@ -82,8 +91,13 @@ export function EnrollDialog({
     },
   })
 
-  const numberOfParticipants = form.watch("numberOfParticipants") || 1
-  const fees = !isFree && amount ? calculateTicketFees(amount, numberOfParticipants) : null
+  const numberOfParticipants = individualOnly ? 1 : form.watch("numberOfParticipants") || 1
+  const fees =
+    !isFree && effectiveAmount && event
+      ? isCompetition
+        ? calculateCompetitionFees(effectiveAmount, event.groupExtraAmount, numberOfParticipants, 0, event.gstEnabled, event.platformFeeEnabled)
+        : calculateTicketFees(effectiveAmount, numberOfParticipants, 0, event.gstEnabled, event.platformFeeEnabled)
+      : null
 
   useEffect(() => {
     if (!open) {
@@ -95,6 +109,12 @@ export function EnrollDialog({
   const isSubmitting = form.formState.isSubmitting
 
   async function onSubmit(values: ParticipantFormValues) {
+    if (!event) return
+    if (individualOnly) values = { ...values, numberOfParticipants: 1 }
+    if (groupOnly && values.numberOfParticipants < 2) {
+      form.setError("numberOfParticipants", { message: "This competition accepts group entries only (minimum 2 members)" })
+      return
+    }
     if (isFree) {
       const result = await addParticipantAction(eventId, values)
       if (!result.success) {
@@ -191,23 +211,31 @@ export function EnrollDialog({
               <DialogDescription className="text-black/60">{eventName}</DialogDescription>
             </DialogHeader>
 
-            {!isFree && amount && fees && (
+            {!isFree && effectiveAmount != null && fees && (
               <div className="bg-[#014421]/5 border border-[#014421]/20 rounded-lg px-4 py-3 space-y-2 text-sm">
                 <div className="flex items-center justify-between text-black/70">
                   <span className="flex items-center gap-1.5">
                     <IndianRupee className="h-3.5 w-3.5" />
-                    ₹{amount.toLocaleString("en-IN")} × {numberOfParticipants} person{numberOfParticipants !== 1 ? "s" : ""}
+                    {isCompetition && numberOfParticipants > 1
+                      ? `₹${effectiveAmount.toLocaleString("en-IN")} + ${numberOfParticipants - 1} × ₹${(extraMemberPrice ?? 0).toLocaleString("en-IN")} (group entry)`
+                      : isCompetition
+                      ? `₹${effectiveAmount.toLocaleString("en-IN")} (individual entry)`
+                      : `₹${effectiveAmount.toLocaleString("en-IN")} × ${numberOfParticipants} person${numberOfParticipants !== 1 ? "s" : ""}`}
                   </span>
                   <span>₹{fees.base.toLocaleString("en-IN")}</span>
                 </div>
-                <div className="flex items-center justify-between text-black/50 text-xs">
-                  <span>GST (18%)</span>
-                  <span>₹{fees.gst.toLocaleString("en-IN")}</span>
-                </div>
-                <div className="flex items-center justify-between text-black/50 text-xs">
-                  <span>Platform fee (2%)</span>
-                  <span>₹{fees.platformFee.toLocaleString("en-IN")}</span>
-                </div>
+                {fees.gst > 0 && (
+                  <div className="flex items-center justify-between text-black/50 text-xs">
+                    <span>GST (18%)</span>
+                    <span>₹{fees.gst.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+                {fees.platformFee > 0 && (
+                  <div className="flex items-center justify-between text-black/50 text-xs">
+                    <span>Platform fee (2%)</span>
+                    <span>₹{fees.platformFee.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
                 <Separator className="bg-[#014421]/20" />
                 <div className="flex items-center justify-between font-semibold text-[#014421]">
                   <span>Total</span>
@@ -293,26 +321,31 @@ export function EnrollDialog({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="numberOfParticipants"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>No. of Persons *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="1"
-                            min={1}
-                            max={10}
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!individualOnly && (
+                    <FormField
+                      control={form.control}
+                      name="numberOfParticipants"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{groupOnly ? "Group Members *" : isCompetition ? "Members *" : "No. of Persons *"}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder={groupOnly ? "2" : "1"}
+                              min={groupOnly ? 2 : 1}
+                              max={10}
+                              {...field}
+                              value={field.value ?? ""}
+                            />
+                          </FormControl>
+                          {isCompetition && participationType === "BOTH" && (
+                            <FormDescription>1 = individual · 2+ = group</FormDescription>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
 
                 <Button
