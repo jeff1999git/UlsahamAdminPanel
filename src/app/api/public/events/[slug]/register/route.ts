@@ -6,6 +6,7 @@ import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug, findEventComplimentaryCodes, incrementComplimentaryCodeUsage } from "@/services/event.service"
 import { countParticipantsForEvent, findParticipantByEventAndPhone } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
+import { validateCompetitionQuantity } from "@/lib/competition"
 
 const registerBodySchema = participantSchema.extend({
   code: z.string().max(50).optional(),
@@ -63,6 +64,14 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: "Event not found" },
         { status: 404, headers: corsHeaders }
+      )
+    }
+
+    const quantityError = validateCompetitionQuantity(event, parsed.data.numberOfParticipants)
+    if (quantityError) {
+      return NextResponse.json(
+        { success: false, error: quantityError },
+        { status: 400, headers: corsHeaders }
       )
     }
 
@@ -130,6 +139,9 @@ export async function POST(
           eventVenue: event.venue,
           numberOfParticipants: participant.numberOfParticipants,
           isFree: event.isFree,
+          isCompetition: event.isCompetition,
+          competitionNumber: participant.competitionNumber,
+          isGroupRegistration: participant.isGroupRegistration,
         },
       },
       { status: 201, headers: corsHeaders }

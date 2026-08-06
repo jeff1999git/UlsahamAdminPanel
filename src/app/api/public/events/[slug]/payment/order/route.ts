@@ -6,7 +6,8 @@ import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug, findEventCoupons } from "@/services/event.service"
 import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { getRazorpay } from "@/lib/razorpay"
-import { calculateTicketFees } from "@/lib/pricing"
+import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
+import { validateCompetitionQuantity } from "@/lib/competition"
 
 const orderBodySchema = participantSchema.extend({
   couponCode: z.string().max(50).optional(),
@@ -64,6 +65,11 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
     }
 
+    const quantityError = validateCompetitionQuantity(event, parsed.data.numberOfParticipants)
+    if (quantityError) {
+      return NextResponse.json({ success: false, error: quantityError }, { status: 400, headers: corsHeaders })
+    }
+
     if (event.capacity !== null) {
       const currentCount = await countParticipantsForEvent(event.id)
       if (currentCount + parsed.data.numberOfParticipants > event.capacity) {
@@ -91,7 +97,9 @@ export async function POST(
     }
 
     const quantity = parsed.data.numberOfParticipants
-    const breakdown = calculateTicketFees(event.effectiveAmount, quantity, couponDiscount, event.gstEnabled, event.platformFeeEnabled)
+    const breakdown = event.isCompetition
+      ? calculateCompetitionFees(event.effectiveAmount, event.groupExtraAmount, quantity, couponDiscount, event.gstEnabled, event.platformFeeEnabled)
+      : calculateTicketFees(event.effectiveAmount, quantity, couponDiscount, event.gstEnabled, event.platformFeeEnabled)
     const totalAmountPaise = Math.round(breakdown.total * 100)
 
     const keyId = process.env.RAZORPAY_KEY_ID

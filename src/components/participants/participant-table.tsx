@@ -131,6 +131,7 @@ export function ParticipantTable({
     try {
       const all = await exportParticipantsAction(eventId)
       const rows = all.map((p) => ({
+        ...(p.competitionNumber != null ? { "Competition No.": p.competitionNumber } : {}),
         "Ticket Code": p.ticketCode,
         "Name": p.name,
         "Phone": p.phone,
@@ -216,7 +217,14 @@ export function ParticipantTable({
 
                       {/* Name + phone + count */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-black truncate">{p.name}</p>
+                        <p className="text-sm font-semibold text-black truncate">
+                          {p.competitionNumber != null && (
+                            <span className="mr-1.5 inline-block rounded bg-[#014421]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#014421] align-middle">
+                              #{p.competitionNumber}
+                            </span>
+                          )}
+                          {p.name}
+                        </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <button
                             className="text-xs text-[#014421] underline underline-offset-2 font-medium"
@@ -301,9 +309,16 @@ export function ParticipantTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs bg-black/10 border border-black px-1.5 py-0.5 rounded font-mono text-black">
-                        {p.ticketCode}
-                      </code>
+                      <div className="flex items-center gap-1.5">
+                        {p.competitionNumber != null && (
+                          <Badge variant="outline" className="text-xs font-bold text-[#014421] border-[#014421]/40 shrink-0">
+                            #{p.competitionNumber}
+                          </Badge>
+                        )}
+                        <code className="text-xs bg-black/10 border border-black px-1.5 py-0.5 rounded font-mono text-black">
+                          {p.ticketCode}
+                        </code>
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-black">{p.phone}</TableCell>
                     <TableCell className="text-sm text-center text-black">
@@ -345,6 +360,7 @@ export function ParticipantTable({
                             eventDate={eventDate}
                             eventVenue={eventVenue}
                             numberOfParticipants={p.numberOfParticipants}
+                            competitionNumber={p.competitionNumber}
                             bannerImageUrl={eventBannerUrl}
                           />
                         ) : (
@@ -353,7 +369,7 @@ export function ParticipantTable({
                             size="icon"
                             className="h-8 w-8 text-black/30 cursor-not-allowed"
                             disabled
-                            title="Ticket locked — payment pending"
+                            title={p.competitionNumber != null ? "Participation card locked — payment pending" : "Ticket locked — payment pending"}
                           >
                             <Lock className="h-4 w-4" />
                           </Button>
@@ -463,6 +479,15 @@ export function ParticipantTable({
                   </span>
                 </div>
               )}
+              {selectedMobile.competitionNumber != null && (
+                <div className="flex items-center gap-2.5">
+                  <Hash className="h-4 w-4 text-[#014421] shrink-0" />
+                  <span className="text-sm font-semibold text-[#014421]">
+                    Competition No. {selectedMobile.competitionNumber}
+                    {selectedMobile.isGroupRegistration ? " (Group)" : ""}
+                  </span>
+                </div>
+              )}
               <div className="flex items-start gap-2.5">
                 <Hash className="h-4 w-4 text-black/40 mt-0.5 shrink-0" />
                 <code className="text-xs bg-black/10 border border-black/20 px-1.5 py-0.5 rounded font-mono text-black break-all">
@@ -500,13 +525,14 @@ export function ParticipantTable({
                     eventDate={eventDate}
                     eventVenue={eventVenue}
                     numberOfParticipants={selectedMobile.numberOfParticipants}
+                    competitionNumber={selectedMobile.competitionNumber}
                     bannerImageUrl={eventBannerUrl}
                     fullWidth
                   />
                 ) : (
                   <Button variant="outline" size="sm" className="w-full text-black/40" disabled>
                     <Lock className="h-3.5 w-3.5 mr-1.5" />
-                    Ticket locked until payment
+                    {selectedMobile.competitionNumber != null ? "Participation card locked until payment" : "Ticket locked until payment"}
                   </Button>
                 )}
 

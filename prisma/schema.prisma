@@ -42,6 +42,10 @@ model Event {
   isEarlyBird              Boolean             @default(false)
   gstEnabled               Boolean             @default(false)
   platformFeeEnabled       Boolean             @default(true)
+  isCompetition            Boolean             @default(false)
+  participationType        ParticipationType   @default(INDIVIDUAL)
+  groupExtraAmount         Float?
+  lastCompetitionNumber    Int                 @default(0)
   status                   EventStatus         @default(ANNOUNCED)
   capacity                 Int?
   featured                 Boolean             @default(false)
@@ -61,6 +65,12 @@ enum EventStatus {
   PUBLISHED
   CANCELLED
   COMPLETED
+}
+
+enum ParticipationType {
+  INDIVIDUAL
+  GROUP
+  BOTH
 }
 
 type CouponCode {
@@ -84,6 +94,8 @@ model Participant {
   age                  Int
   numberOfParticipants Int       @default(1)
   ticketCode           String    @unique
+  competitionNumber    Int?
+  isGroupRegistration  Boolean   @default(false)
   amountPaid           Boolean   @default(false)
   attended             Boolean   @default(false)
   attendedAt           DateTime?
