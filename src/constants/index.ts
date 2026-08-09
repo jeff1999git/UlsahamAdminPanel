@@ -9,6 +9,8 @@ export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
 export const DEFAULT_PAGE_SIZE = 10
 export const LOGS_PAGE_SIZE = 20
 export const MAX_PARTICIPANTS_PER_REGISTRATION = 10
+// Chest numbers start at COMPETITION_NUMBER_BASE + 1 (i.e. 1001, 1002, ...)
+export const COMPETITION_NUMBER_BASE = 1000
 export const IST_TIMEZONE = "Asia/Kolkata"
 
 export const EVENT_STATUS_LABELS: Record<string, string> = {
