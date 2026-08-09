@@ -141,7 +141,7 @@ async function loadSvgAsImage(svgEl: SVGSVGElement): Promise<HTMLImageElement> {
 }
 
 async function generateTicketCanvas(
-  svgEl: SVGSVGElement | null,
+  svgEl: SVGSVGElement,
   opts: {
     ticketCode: string
     participantName: string
@@ -149,15 +149,11 @@ async function generateTicketCanvas(
     eventDate: string
     eventVenue: string
     numberOfParticipants: number
-    competitionNumber?: number | null
     bannerImageUrl?: string | null
   }
 ): Promise<HTMLCanvasElement> {
-  // Competition entry card: big competition number instead of a QR code
-  const isEntryCard = opts.competitionNumber != null
-
   const [qrImg, posterImg, logoImg] = await Promise.all([
-    svgEl ? loadSvgAsImage(svgEl) : Promise.resolve(null),
+    loadSvgAsImage(svgEl),
     opts.bannerImageUrl ? loadImageFromUrl(opts.bannerImageUrl) : Promise.resolve(null),
     loadImageFromUrl("/brand_logo.avif"),
   ])
@@ -177,10 +173,10 @@ async function generateTicketCanvas(
     ? BODY_Y + 16 + POSTER_H + 48
     : BODY_Y + 24
 
-  // "EVENT TICKET" / "ENTRY CARD" heading (52) + 3 rows × 70px each
+  // "EVENT TICKET" heading (52) + 3 rows × 70px each
   const INFO_H = 52 + 3 * 70
   const QR_BOX_Y = INFO_Y_START + INFO_H + 16
-  const QR_BOX_H = isEntryCard ? 220 : QR_SIZE + QR_BOX_PAD * 2 + 30
+  const QR_BOX_H = QR_SIZE + QR_BOX_PAD * 2 + 30
   const FOOTER_Y = QR_BOX_Y + QR_BOX_H + 20
   const H = FOOTER_Y + 84
 
@@ -231,7 +227,7 @@ async function generateTicketCanvas(
   ctx.fillStyle = "#000"
   ctx.font = "bold 30px Arial, sans-serif"
   ctx.textAlign = "center"
-  ctx.fillText(isEntryCard ? "PARTICIPATION CARD" : "EVENT TICKET", W / 2, y)
+  ctx.fillText("EVENT TICKET", W / 2, y)
   y += 52
 
   const COL_L = W / 4
@@ -270,29 +266,20 @@ async function generateTicketCanvas(
   // Row 3: Date
   ctx.fillText(col(`Date : ${opts.eventDate}`), COL_L, y)
 
-  // ── White box: competition number (entry card) or QR code ─────
+  // ── White QR box ──────────────────────────────────────────────
   ctx.fillStyle = "#fff"
   drawRoundRect(ctx, QR_BOX_X, QR_BOX_Y, QR_BOX_W, QR_BOX_H, 18)
   ctx.fill()
 
-  if (isEntryCard) {
-    ctx.fillStyle = "#666"
-    ctx.font = "bold 20px Arial, sans-serif"
-    ctx.fillText("CHEST NO", W / 2, QR_BOX_Y + 52)
-    ctx.fillStyle = GREEN
-    ctx.font = "bold 120px Arial, sans-serif"
-    ctx.fillText(String(opts.competitionNumber), W / 2, QR_BOX_Y + 175)
-  } else if (qrImg) {
-    const QR_X = (W - QR_SIZE) / 2
-    const QR_Y_POS = QR_BOX_Y + QR_BOX_PAD
-    ctx.fillStyle = "#fff"
-    ctx.fillRect(QR_X, QR_Y_POS, QR_SIZE, QR_SIZE)
-    ctx.drawImage(qrImg, QR_X, QR_Y_POS, QR_SIZE, QR_SIZE)
+  const QR_X = (W - QR_SIZE) / 2
+  const QR_Y_POS = QR_BOX_Y + QR_BOX_PAD
+  ctx.fillStyle = "#fff"
+  ctx.fillRect(QR_X, QR_Y_POS, QR_SIZE, QR_SIZE)
+  ctx.drawImage(qrImg, QR_X, QR_Y_POS, QR_SIZE, QR_SIZE)
 
-    ctx.fillStyle = "#666"
-    ctx.font = "14px Arial, sans-serif"
-    ctx.fillText("Scan this code at the entrance", W / 2, QR_Y_POS + QR_SIZE + 22)
-  }
+  ctx.fillStyle = "#666"
+  ctx.font = "14px Arial, sans-serif"
+  ctx.fillText("Scan this code at the entrance", W / 2, QR_Y_POS + QR_SIZE + 22)
 
   // ── Footer ────────────────────────────────────────────────────
   ctx.strokeStyle = "#00000015"
@@ -330,45 +317,52 @@ export function QRCodeModal({
   const isEntryCard = competitionNumber != null
 
   async function handleDownload() {
-    const svgEl = qrRef.current?.querySelector("svg") ?? null
-    if (!isEntryCard && !svgEl) {
-      toast.error("QR code not ready — please wait a moment")
-      return
-    }
     setDownloading(true)
     try {
-      const canvas = await generateTicketCanvas(svgEl, {
+      if (isEntryCard) {
+        // Competition participation card: plain details PDF, no ticket art / QR
+        downloadParticipationCardPdf(
+          {
+            chestNumber: competitionNumber!,
+            participantName,
+            eventName,
+            eventDate,
+            eventVenue,
+            numberOfParticipants,
+            ticketCode,
+            instructions: competitionInstructions,
+            notes: competitionNotes,
+          },
+          `participation-card-${ticketCode}.pdf`
+        )
+        return
+      }
+
+      const svgEl = qrRef.current?.querySelector("svg")
+      if (!svgEl) {
+        toast.error("QR code not ready — please wait a moment")
+        return
+      }
+      const canvas = await generateTicketCanvas(svgEl as SVGSVGElement, {
         ticketCode,
         participantName,
         eventName,
         eventDate,
         eventVenue,
         numberOfParticipants,
-        competitionNumber,
         bannerImageUrl,
       })
-      const hasExtras = !!(competitionInstructions?.trim() || competitionNotes?.trim())
-      if (isEntryCard && hasExtras) {
-        // Card + instructions/notes bundled as a PDF
-        downloadParticipationCardPdf(canvas, {
-          eventName,
-          instructions: competitionInstructions,
-          notes: competitionNotes,
-          filename: `participation-card-${ticketCode}.pdf`,
-        })
-      } else {
-        canvas.toBlob((blob) => {
-          if (!blob) return
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement("a")
-          a.href = url
-          a.download = isEntryCard ? `participation-card-${ticketCode}.png` : `ticket-${ticketCode}.png`
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          URL.revokeObjectURL(url)
-        }, "image/png")
-      }
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `ticket-${ticketCode}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, "image/png")
     } catch {
       toast.error(isEntryCard ? "Failed to generate participation card" : "Failed to generate ticket")
     } finally {
@@ -413,8 +407,8 @@ export function QRCodeModal({
           <Button onClick={handleDownload} disabled={downloading} className="w-full">
             <Download className="h-4 w-4 mr-2" />
             {downloading
-              ? (isEntryCard ? "Generating Participation Card..." : "Generating Ticket...")
-              : (isEntryCard ? "Download Participation Card" : "Download Ticket")}
+              ? (isEntryCard ? "Generating PDF..." : "Generating Ticket...")
+              : (isEntryCard ? "Download Participation Card (PDF)" : "Download Ticket")}
           </Button>
         </div>
       </DialogContent>

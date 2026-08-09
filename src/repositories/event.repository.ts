@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import type { EventStatus, Prisma } from "@prisma/client"
 import type { EventListParams } from "@/types/event.types"
-import { DEFAULT_PAGE_SIZE } from "@/constants"
+import { DEFAULT_PAGE_SIZE, COMPETITION_NUMBER_BASE } from "@/constants"
 
 export async function findEventById(id: string) {
   return prisma.event.findUnique({
@@ -148,7 +148,7 @@ export async function allocateCompetitionNumber(eventId: string) {
     data: { lastCompetitionNumber: { increment: 1 } },
     select: { lastCompetitionNumber: true },
   })
-  return updated.lastCompetitionNumber
+  return COMPETITION_NUMBER_BASE + updated.lastCompetitionNumber
 }
 
 export async function createEvent(data: Prisma.EventCreateInput) {
