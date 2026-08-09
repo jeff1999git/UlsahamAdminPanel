@@ -1,6 +1,6 @@
-import type { Event, EventStatus, Participant, CouponCode, ComplimentaryCode, ParticipationType } from "@prisma/client"
+import type { Event, EventStatus, Participant, CouponCode, ComplimentaryCode, ParticipationType, EventImage } from "@prisma/client"
 
-export type { CouponCode, ComplimentaryCode, ParticipationType }
+export type { CouponCode, ComplimentaryCode, ParticipationType, EventImage }
 
 export type EventWithParticipantCount = Event & {
   _count: { participants: number }
@@ -39,6 +39,7 @@ export type PublicEvent = Pick<
   effectiveAmount: number | null
   registeredCount: number
   isFull: boolean
+  galleryImageUrls: string[]
 }
 
 export type CreateEventInput = {
@@ -68,6 +69,7 @@ export type CreateEventInput = {
   competitionNotes?: string | null
   couponCodes?: CouponCode[]
   complimentaryCodes?: ComplimentaryCode[]
+  galleryImages?: EventImage[]
 }
 
 export type UpdateEventInput = Partial<CreateEventInput>

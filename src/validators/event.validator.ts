@@ -24,6 +24,13 @@ const couponCodeSchema = z.object({
 
 export type CouponCodeFormValue = z.infer<typeof couponCodeSchema>
 
+const eventImageSchema = z.object({
+  url: z.string().url("Invalid image URL"),
+  id: z.string().min(1, "Image ID is required"),
+})
+
+export const MAX_GALLERY_IMAGES = 10
+
 const baseEventSchema = z.object({
   name: z
     .string()
@@ -83,6 +90,7 @@ const baseEventSchema = z.object({
   ),
   couponCodes: z.array(couponCodeSchema).optional(),
   complimentaryCodes: z.array(complimentaryCodeSchema).optional(),
+  galleryImages: z.array(eventImageSchema).max(MAX_GALLERY_IMAGES, `Maximum ${MAX_GALLERY_IMAGES} gallery images`).optional(),
 })
 
 export const createEventSchema = baseEventSchema
