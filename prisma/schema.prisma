@@ -53,6 +53,7 @@ model Event {
   featured                 Boolean             @default(false)
   couponCodes              CouponCode[]
   complimentaryCodes       ComplimentaryCode[]
+  galleryImages            EventImage[]
   archivedParticipantCount Int                 @default(0)
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
@@ -84,6 +85,11 @@ type ComplimentaryCode {
   code      String
   maxUses   Int
   usedCount Int
+}
+
+type EventImage {
+  url String
+  id  String
 }
 
 model Participant {

@@ -47,8 +47,14 @@ export async function getPublishedEventBySlug(slug: string) {
   const isFull = event.capacity !== null && registeredCount >= event.capacity
   const effectiveAmount = getEffectiveAmount(event)
 
-  const { _count, bannerImageId, couponCodes, complimentaryCodes, lastCompetitionNumber, ...publicFields } = event
-  return { ...publicFields, registeredCount, isFull, effectiveAmount }
+  const { _count, bannerImageId, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...publicFields } = event
+  return {
+    ...publicFields,
+    registeredCount,
+    isFull,
+    effectiveAmount,
+    galleryImageUrls: galleryImages.map((img) => img.url),
+  }
 }
 
 export async function getEvents(params: EventListParams) {
@@ -71,7 +77,7 @@ export async function getPublishedEvents(params: {
       const registeredCount = event._count.participants
       const isFull = event.capacity !== null && registeredCount >= event.capacity
       const effectiveAmount = getEffectiveAmount(event)
-      const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, ...rest } = event
+      const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...rest } = event
       return { ...rest, registeredCount, isFull, effectiveAmount }
     })
   )
@@ -128,6 +134,7 @@ export async function createNewEvent(input: CreateEventInput) {
     featured: input.featured,
     couponCodes: { set: input.couponCodes ?? [] },
     complimentaryCodes: { set: input.complimentaryCodes ?? [] },
+    galleryImages: { set: input.galleryImages ?? [] },
   } as Parameters<typeof createEvent>[0])
 }
 
@@ -205,6 +212,13 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
     updateData.bannerImageId = input.bannerImageId
   }
 
+  if (input.galleryImages !== undefined) {
+    const keptIds = new Set(input.galleryImages.map((img) => img.id))
+    const removed = existing.galleryImages.filter((img) => !keptIds.has(img.id))
+    await Promise.all(removed.map((img) => deleteImage(img.id)))
+    updateData.galleryImages = { set: input.galleryImages }
+  }
+
   return updateEvent(id, updateData)
 }
 
@@ -219,6 +233,7 @@ export async function deleteEventWithCleanup(id: string) {
   }
 
   await deleteImage(event.bannerImageId)
+  await Promise.all(event.galleryImages.map((img) => deleteImage(img.id)))
   return deleteEvent(id)
 }
 

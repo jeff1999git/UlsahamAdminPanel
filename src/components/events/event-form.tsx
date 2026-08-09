@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ImageUpload } from "@/components/shared/image-upload"
-import { createEventSchema, type CreateEventFormValues } from "@/validators/event.validator"
+import { MultiImageUpload } from "@/components/shared/multi-image-upload"
+import { createEventSchema, MAX_GALLERY_IMAGES, type CreateEventFormValues } from "@/validators/event.validator"
 import { createEventAction, updateEventAction } from "@/actions/event.actions"
 import { generateSlug } from "@/lib/slug"
 import type { Event } from "@prisma/client"
@@ -66,7 +67,7 @@ export function EventForm({ event }: EventFormProps) {
   const [newCompCode, setNewCompCode] = useState("")
   const [newCompMaxUses, setNewCompMaxUses] = useState("")
 
-  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; isCompetition?: boolean; participationType?: "INDIVIDUAL" | "GROUP" | "BOTH"; groupExtraAmount?: number | null; competitionInstructions?: string | null; competitionNotes?: string | null; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[] }) | undefined
+  const ev = event as (typeof event & { earlyBirdAmount?: number | null; isEarlyBird?: boolean; gstEnabled?: boolean; platformFeeEnabled?: boolean; isCompetition?: boolean; participationType?: "INDIVIDUAL" | "GROUP" | "BOTH"; groupExtraAmount?: number | null; competitionInstructions?: string | null; competitionNotes?: string | null; complimentaryCodes?: { code: string; maxUses: number; usedCount: number }[]; galleryImages?: { url: string; id: string }[] }) | undefined
 
   const form = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventSchema),
@@ -97,6 +98,7 @@ export function EventForm({ event }: EventFormProps) {
       featured: ev?.featured ?? false,
       couponCodes: ev?.couponCodes ?? [],
       complimentaryCodes: ev?.complimentaryCodes ?? [],
+      galleryImages: ev?.galleryImages ?? [],
     },
   })
 
@@ -114,6 +116,11 @@ export function EventForm({ event }: EventFormProps) {
   const { fields: compFields, append: appendComp, remove: removeComp } = useFieldArray({
     control: form.control,
     name: "complimentaryCodes",
+  })
+
+  const { fields: galleryFields, append: appendGalleryImages, remove: removeGalleryImage } = useFieldArray({
+    control: form.control,
+    name: "galleryImages",
   })
 
   function handleAddComp() {
@@ -804,6 +811,35 @@ export function EventForm({ event }: EventFormProps) {
                           disabled={isSubmitting}
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Gallery Images</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="galleryImages"
+                  render={() => (
+                    <FormItem>
+                      <FormControl>
+                        <MultiImageUpload
+                          images={galleryFields}
+                          onAdd={(images) => appendGalleryImages(images)}
+                          onRemove={removeGalleryImage}
+                          disabled={isSubmitting}
+                          max={MAX_GALLERY_IMAGES}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Extra photos shown in a gallery on the public event page, navigable alongside the banner
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
