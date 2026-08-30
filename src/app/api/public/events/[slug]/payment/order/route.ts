@@ -8,6 +8,7 @@ import { countParticipantsForEvent } from "@/repositories/participant.repository
 import { getRazorpay } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
+import { hasEventStarted } from "@/lib/event-time"
 
 const orderBodySchema = participantSchema.extend({
   couponCode: z.string().max(50).optional(),
@@ -57,6 +58,12 @@ export async function POST(
     const event = await getPublishedEventBySlug(slug)
     if (!event) {
       return NextResponse.json({ success: false, error: "Event not found" }, { status: 404, headers: corsHeaders })
+    }
+    if (hasEventStarted(event)) {
+      return NextResponse.json(
+        { success: false, error: "Booking is closed — this event has already started." },
+        { status: 410, headers: corsHeaders }
+      )
     }
     if (event.isFree || !event.effectiveAmount) {
       return NextResponse.json({ success: false, error: "This is a free event — use the register endpoint" }, { status: 400, headers: corsHeaders })
