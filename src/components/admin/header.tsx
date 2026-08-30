@@ -39,7 +39,6 @@ export function Header({ username, role }: HeaderProps) {
   const title = getPageTitle(pathname)
 
   const isSuperAdmin = role === "SUPER_ADMIN"
-  const isUser = role === "USER"
 
   return (
     <header className="sticky top-0 z-30 bg-background border-b border-black px-4 sm:px-6 py-4">
@@ -93,7 +92,7 @@ export function Header({ username, role }: HeaderProps) {
                 </DropdownMenuItem>
               )}
 
-              {!isUser && (
+              {isSuperAdmin && (
                 <DropdownMenuItem asChild>
                   <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer">
                     <Settings className="h-4 w-4" />

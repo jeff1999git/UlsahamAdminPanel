@@ -10,10 +10,9 @@ export const metadata: Metadata = { title: "Settings" }
 export default async function SettingsPage() {
   const session = await auth()
   const role = (session?.user as { role?: string })?.role
-  if (role === "USER") redirect("/admin/events")
+  if (role !== "SUPER_ADMIN") redirect("/admin/events")
 
   const settings = await getSettings()
-  const isSuperAdmin = role === "SUPER_ADMIN"
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -35,7 +34,7 @@ export default async function SettingsPage() {
         }}
       />
 
-      {isSuperAdmin && <BrandPartnersSection partners={settings.brandPartners} />}
+      <BrandPartnersSection partners={settings.brandPartners} />
     </div>
   )
 }
