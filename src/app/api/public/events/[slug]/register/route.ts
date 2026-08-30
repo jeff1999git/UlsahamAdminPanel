@@ -7,6 +7,7 @@ import { getPublishedEventBySlug, findEventComplimentaryCodes, incrementComplime
 import { countParticipantsForEvent, findParticipantByEventAndPhone } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
 import { validateCompetitionQuantity } from "@/lib/competition"
+import { hasEventStarted } from "@/lib/event-time"
 
 const registerBodySchema = participantSchema.extend({
   code: z.string().max(50).optional(),
@@ -64,6 +65,13 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: "Event not found" },
         { status: 404, headers: corsHeaders }
+      )
+    }
+
+    if (hasEventStarted(event)) {
+      return NextResponse.json(
+        { success: false, error: "Booking is closed — this event has already started." },
+        { status: 410, headers: corsHeaders }
       )
     }
 
