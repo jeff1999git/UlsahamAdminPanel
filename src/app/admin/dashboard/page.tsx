@@ -44,7 +44,7 @@ async function DashboardContent({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-4 ${isSuperAdmin ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
         <StatsCard
           title="Total Events"
           value={stats.totalEvents}
@@ -72,13 +72,15 @@ async function DashboardContent({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           description="Total registered"
           iconClassName="bg-[#014421]/10"
         />
-        <StatsCard
-          title="Revenue"
-          value={formatCurrency(stats.totalRevenue)}
-          icon={DollarSign}
-          description="From paid events"
-          iconClassName="bg-[#014421]/10"
-        />
+        {isSuperAdmin && (
+          <StatsCard
+            title="Revenue"
+            value={formatCurrency(stats.totalRevenue)}
+            icon={DollarSign}
+            description="From paid events"
+            iconClassName="bg-[#014421]/10"
+          />
+        )}
       </div>
 
       {/* Quick Actions */}
