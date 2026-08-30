@@ -29,7 +29,7 @@ import { formatDate, formatCurrency } from "@/lib/utils"
 import type { EventWithParticipantCount } from "@/types/event.types"
 
 function participantCount(event: EventWithParticipantCount): number {
-  return event._count.participants || event.archivedParticipantCount || 0
+  return event.registeredCount
 }
 
 interface EventTableProps {

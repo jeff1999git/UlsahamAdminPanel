@@ -13,7 +13,7 @@ import {
   findEventComplimentaryCodes,
   incrementComplimentaryCodeUsage,
 } from "@/repositories/event.repository"
-import { countParticipantsForEvent } from "@/repositories/participant.repository"
+import { countParticipantsForEvent, sumParticipantsForEvents } from "@/repositories/participant.repository"
 import { deleteImage } from "@/lib/cloudinary"
 import { generateSlug } from "@/lib/slug"
 import { sanitizeString } from "@/lib/utils"
@@ -59,7 +59,13 @@ export async function getPublishedEventBySlug(slug: string) {
 
 export async function getEvents(params: EventListParams) {
   await autoCompleteExpiredEvents()
-  return listEvents(params)
+  const result = await listEvents(params)
+  const sums = await sumParticipantsForEvents(result.events.map((event) => event.id))
+  const events = result.events.map((event) => ({
+    ...event,
+    registeredCount: sums[event.id] ?? event.archivedParticipantCount ?? 0,
+  }))
+  return { ...result, events }
 }
 
 export async function getPublishedEvents(params: {
