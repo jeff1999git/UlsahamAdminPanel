@@ -82,7 +82,15 @@ export async function listPublishedEvents(params: {
 
   if (!past) {
     if (featured === true) where.featured = true
-    if (upcoming === true) where.date = { gt: new Date() }
+    if (upcoming === true) {
+      // Day-granularity boundary (matches autoCompleteExpiredEvents below): an
+      // event stays "upcoming" for its whole calendar day, not just until the
+      // exact instant stored in `date` (which is date-only, midnight UTC) —
+      // otherwise today's events vanish from "upcoming" hours before they start.
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+      where.date = { gte: startOfToday }
+    }
   }
 
   const [events, total] = await Promise.all([
