@@ -4,6 +4,7 @@ export type { CouponCode, ComplimentaryCode, ParticipationType, EventImage }
 
 export type EventWithParticipantCount = Event & {
   _count: { participants: number }
+  registeredCount: number
 }
 
 export type EventWithParticipants = Event & {

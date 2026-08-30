@@ -116,6 +116,16 @@ export async function countParticipantsForEvent(eventId: string) {
   return result._sum.numberOfParticipants ?? 0
 }
 
+export async function sumParticipantsForEvents(eventIds: string[]): Promise<Record<string, number>> {
+  if (eventIds.length === 0) return {}
+  const groups = await prisma.participant.groupBy({
+    by: ["eventId"],
+    where: { eventId: { in: eventIds } },
+    _sum: { numberOfParticipants: true },
+  })
+  return Object.fromEntries(groups.map((g) => [g.eventId, g._sum.numberOfParticipants ?? 0]))
+}
+
 export async function markAttendance(ticketCode: string, eventId: string) {
   const participant = await prisma.participant.findUnique({
     where: { ticketCode },
@@ -144,12 +154,15 @@ export async function pruneOldEventParticipants() {
   })
 
   const stale = events.filter((e) => e._count.participants > 0)
+  if (stale.length === 0) return
+
+  const sums = await sumParticipantsForEvents(stale.map((e) => e.id))
 
   for (const event of stale) {
-    // Snapshot the count onto the event before deleting
+    // Snapshot the total participant count onto the event before deleting
     await prisma.event.update({
       where: { id: event.id },
-      data: { archivedParticipantCount: event._count.participants },
+      data: { archivedParticipantCount: sums[event.id] ?? event._count.participants },
     })
     await prisma.participant.deleteMany({ where: { eventId: event.id } })
   }
