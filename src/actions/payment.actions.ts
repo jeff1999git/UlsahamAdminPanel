@@ -7,11 +7,7 @@ import { getRazorpay } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
 import { findEventById } from "@/repositories/event.repository"
-import {
-  findParticipantByEventAndPhone,
-  countParticipantsForEvent,
-  updateParticipant,
-} from "@/repositories/participant.repository"
+import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
 import { logActivity } from "@/lib/activity-logger"
@@ -53,21 +49,13 @@ export async function createPaymentOrderAction(
     if (event.status !== "PUBLISHED") return { success: false, error: "Event is not accepting registrations" }
     if (event.isFree || !event.amount) return { success: false, error: "This is a free event" }
 
-    const existing = await findParticipantByEventAndPhone(eventId, parsed.data.phone)
-
-    // Block fully-paid registrations; allow re-payment when SUPER_ADMIN marked unpaid
-    if (existing?.amountPaid) {
-      return { success: false, error: "Phone number already registered for this event" }
-    }
-
-    // Re-payment: use existing slot count; participant already occupies capacity
-    const isRepayment = !!existing
-    const quantity = isRepayment ? existing.numberOfParticipants : parsed.data.numberOfParticipants
+    // Each enrollment is its own booking — a phone number may hold several.
+    const quantity = parsed.data.numberOfParticipants
 
     const quantityError = validateCompetitionQuantity(event, quantity)
     if (quantityError) return { success: false, error: quantityError }
 
-    if (!isRepayment && event.capacity !== null) {
+    if (event.capacity !== null) {
       const currentCount = await countParticipantsForEvent(eventId)
       if (currentCount + quantity > event.capacity) {
         return { success: false, error: "Event is full" }
@@ -134,40 +122,21 @@ export async function verifyAndEnrollAction(
   if (!parsed.success) return { success: false, error: "Invalid form data" }
 
   try {
-    const existing = await findParticipantByEventAndPhone(eventId, parsed.data.phone)
-
-    if (existing) {
-      if (!existing.amountPaid) {
-        // Re-payment after SUPER_ADMIN marked unpaid, or webhook race
-        const updated = await updateParticipant(existing.id, { amountPaid: true })
-        await logActivity({
-          adminUsername: session.username,
-          adminRole: session.role,
-          action: "PARTICIPANT_UPDATED",
-          entity: "Participant",
-          entityId: existing.id,
-          description: `Re-payment completed: ${existing.name} (${existing.ticketCode}) — Payment: ${paymentData.razorpay_payment_id}`,
-          metadata: {
-            eventId,
-            phone: existing.phone,
-            paymentId: paymentData.razorpay_payment_id,
-            orderId: paymentData.razorpay_order_id,
-          },
-        })
-        revalidatePath(`/admin/events/${eventId}/participants`)
-        return { success: true, data: updated }
-      }
-      // Webhook already enrolled + paid — idempotent success
-      revalidatePath(`/admin/events/${eventId}/participants`)
-      return { success: true, data: existing }
-    }
-
-    const { participant } = await registerParticipant({
+    // Idempotent on the Razorpay order id: if the webhook already enrolled
+    // this order, the existing booking is returned instead of a second one.
+    const { participant, isNew } = await registerParticipant({
       eventId,
       ...parsed.data,
       email: parsed.data.email || null,
       amountPaid: true,
+      paymentOrderId: paymentData.razorpay_order_id,
+      paymentId: paymentData.razorpay_payment_id,
     })
+
+    if (!isNew) {
+      revalidatePath(`/admin/events/${eventId}/participants`)
+      return { success: true, data: participant }
+    }
 
     await logActivity({
       adminUsername: session.username,

@@ -78,15 +78,17 @@ export async function getPublishedEvents(params: {
   await autoCompleteExpiredEvents()
   const result = await listPublishedEvents(params)
 
-  const eventsWithMeta = await Promise.all(
-    result.events.map(async (event) => {
-      const registeredCount = event._count.participants
-      const isFull = event.capacity !== null && registeredCount >= event.capacity
-      const effectiveAmount = getEffectiveAmount(event)
-      const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...rest } = event
-      return { ...rest, registeredCount, isFull, effectiveAmount }
-    })
-  )
+  // Seats booked = sum of numberOfParticipants across bookings (a person may
+  // hold several bookings), matching getPublishedEventBySlug — not row count.
+  const sums = await sumParticipantsForEvents(result.events.map((event) => event.id))
+
+  const eventsWithMeta = result.events.map((event) => {
+    const registeredCount = sums[event.id] ?? event.archivedParticipantCount ?? 0
+    const isFull = event.capacity !== null && registeredCount >= event.capacity
+    const effectiveAmount = getEffectiveAmount(event)
+    const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...rest } = event
+    return { ...rest, registeredCount, isFull, effectiveAmount }
+  })
 
   return { ...result, events: eventsWithMeta }
 }

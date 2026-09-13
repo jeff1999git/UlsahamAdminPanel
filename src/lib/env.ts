@@ -17,6 +17,9 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // Shared with the customer site's server-side proxy so per-visitor rate
+  // limiting works behind it (Vercel overwrites x-forwarded-for on ingress).
+  PROXY_SHARED_SECRET: z.string().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 })
 

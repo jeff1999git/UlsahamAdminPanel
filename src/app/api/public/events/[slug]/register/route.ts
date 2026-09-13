@@ -4,8 +4,8 @@ import { registerRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug, findEventComplimentaryCodes, incrementComplimentaryCodeUsage } from "@/services/event.service"
-import { countParticipantsForEvent, findParticipantByEventAndPhone } from "@/repositories/participant.repository"
-import { registerParticipant } from "@/services/participant.service"
+import { countParticipantsForEvent } from "@/repositories/participant.repository"
+import { registerParticipant, PHONE_ALREADY_REGISTERED, EVENT_FULL } from "@/services/participant.service"
 import { validateCompetitionQuantity } from "@/lib/competition"
 import { hasEventStarted } from "@/lib/event-time"
 
@@ -106,13 +106,7 @@ export async function POST(
       complimentaryCode = match.code
     }
 
-    const existingParticipant = await findParticipantByEventAndPhone(event.id, parsed.data.phone)
-    if (existingParticipant) {
-      return NextResponse.json(
-        { success: false, error: "This phone number is already registered for this event" },
-        { status: 409, headers: corsHeaders }
-      )
-    }
+    // A person may hold several bookings for one event — no per-phone block here.
 
     if (event.capacity !== null) {
       const currentCount = await countParticipantsForEvent(event.id)
@@ -155,6 +149,19 @@ export async function POST(
       { status: 201, headers: corsHeaders }
     )
   } catch (error) {
+    const msg = error instanceof Error ? error.message : ""
+    if (msg === EVENT_FULL) {
+      return NextResponse.json(
+        { success: false, error: "Event is full" },
+        { status: 410, headers: corsHeaders }
+      )
+    }
+    if (msg === PHONE_ALREADY_REGISTERED) {
+      return NextResponse.json(
+        { success: false, error: "This phone number is already registered for this event" },
+        { status: 409, headers: corsHeaders }
+      )
+    }
     console.error("Registration error:", error)
     return NextResponse.json(
       { success: false, error: "Registration failed. Please try again." },

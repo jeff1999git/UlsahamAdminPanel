@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { myTicketsByUserRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
-import { findTicketCodesByEmail } from "@/repositories/participant.repository"
+import { findTicketCodesByEmail, findTicketCodesByPhone } from "@/repositories/participant.repository"
 
-const bodySchema = z.object({
-  email: z.string().email("Invalid email address"),
-})
+// The site sends whichever identifier the account has: a 10-digit phone or an email.
+const bodySchema = z
+  .object({
+    email: z.string().email("Invalid email address").optional(),
+    phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits").optional(),
+  })
+  .refine((b) => !!b.email || !!b.phone, { message: "email or phone is required", path: ["email"] })
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request)
@@ -44,8 +48,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const rows = await findTicketCodesByEmail(parsed.data.email)
-    const ticketCodes = rows.map((r) => r.ticketCode)
+    const [byPhone, byEmail] = await Promise.all([
+      parsed.data.phone ? findTicketCodesByPhone(parsed.data.phone) : Promise.resolve([]),
+      parsed.data.email ? findTicketCodesByEmail(parsed.data.email) : Promise.resolve([]),
+    ])
+    const ticketCodes = Array.from(new Set([...byPhone, ...byEmail].map((r) => r.ticketCode)))
 
     return NextResponse.json(
       { success: true, data: { ticketCodes } },

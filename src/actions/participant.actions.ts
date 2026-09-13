@@ -17,6 +17,7 @@ import {
   markEntry,
 } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
+import { findParticipantByEventAndPhone } from "@/repositories/participant.repository"
 import type { ActionResult } from "@/types"
 import type { Participant } from "@prisma/client"
 import type { ParticipantListParams } from "@/types/participant.types"
@@ -417,6 +418,13 @@ export async function bulkAddParticipantsAction(
 
   for (const row of rows) {
     try {
+      // Re-running an import must not duplicate people: skip phones already on the event.
+      const existing = await findParticipantByEventAndPhone(eventId, row.phone)
+      if (existing) {
+        result.skipped++
+        continue
+      }
+
       await registerParticipant({
         eventId,
         name: row.name,
