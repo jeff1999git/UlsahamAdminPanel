@@ -105,17 +105,24 @@ model Participant {
   competitionNumber    Int?
   isGroupRegistration  Boolean   @default(false)
   amountPaid           Boolean   @default(false)
+  // Razorpay identifiers for paid bookings. paymentOrderId is the idempotency
+  // key that lets payment/verify and the webhook safely replay the same order.
+  paymentOrderId       String?
+  paymentId            String?
   attended             Boolean   @default(false)
   attendedAt           DateTime?
   enteredCount         Int       @default(0)
   registeredAt         DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  @@unique([eventId, phone])
-  @@unique([eventId, email])
+  // A person may hold several bookings (tickets) for the same event, so
+  // phone/email are deliberately NOT unique per event — each booking gets its
+  // own ticketCode.
   @@index([eventId])
+  @@index([eventId, phone])
   @@index([phone])
   @@index([email])
+  @@index([paymentOrderId])
 }
 
 type BrandPartner {

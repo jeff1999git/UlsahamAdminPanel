@@ -4,7 +4,7 @@ import { paymentOrderRateLimit, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug, findEventCoupons } from "@/services/event.service"
-import { countParticipantsForEvent } from "@/repositories/participant.repository"
+import { countParticipantsForEvent, findParticipantByTicketCodeOnly } from "@/repositories/participant.repository"
 import { getRazorpay } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
@@ -12,6 +12,8 @@ import { hasEventStarted } from "@/lib/event-time"
 
 const orderBodySchema = participantSchema.extend({
   couponCode: z.string().max(50).optional(),
+  /** Pay for an existing unpaid ticket instead of creating a new booking. */
+  ticketCode: z.string().trim().min(1).max(40).optional(),
 })
 
 export async function OPTIONS(request: NextRequest) {
@@ -68,19 +70,37 @@ export async function POST(
     if (event.isFree || !event.effectiveAmount) {
       return NextResponse.json({ success: false, error: "This is a free event — use the register endpoint" }, { status: 400, headers: corsHeaders })
     }
-    if (event.isFull) {
-      return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
+
+    // Re-payment of an existing unpaid ticket: the ticket already occupies
+    // capacity and its quantity is authoritative (never trust the client's).
+    let repayTicket: Awaited<ReturnType<typeof findParticipantByTicketCodeOnly>> = null
+    if (parsed.data.ticketCode) {
+      repayTicket = await findParticipantByTicketCodeOnly(parsed.data.ticketCode.toUpperCase())
+      if (!repayTicket || repayTicket.eventId !== event.id) {
+        return NextResponse.json({ success: false, error: "Ticket not found for this event" }, { status: 404, headers: corsHeaders })
+      }
+      if (repayTicket.amountPaid) {
+        return NextResponse.json({ success: false, error: "This ticket is already paid" }, { status: 409, headers: corsHeaders })
+      }
     }
 
-    const quantityError = validateCompetitionQuantity(event, parsed.data.numberOfParticipants)
-    if (quantityError) {
-      return NextResponse.json({ success: false, error: quantityError }, { status: 400, headers: corsHeaders })
-    }
+    const quantity = repayTicket ? repayTicket.numberOfParticipants : parsed.data.numberOfParticipants
 
-    if (event.capacity !== null) {
-      const currentCount = await countParticipantsForEvent(event.id)
-      if (currentCount + parsed.data.numberOfParticipants > event.capacity) {
+    if (!repayTicket) {
+      if (event.isFull) {
         return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
+      }
+
+      const quantityError = validateCompetitionQuantity(event, quantity)
+      if (quantityError) {
+        return NextResponse.json({ success: false, error: quantityError }, { status: 400, headers: corsHeaders })
+      }
+
+      if (event.capacity !== null) {
+        const currentCount = await countParticipantsForEvent(event.id)
+        if (currentCount + quantity > event.capacity) {
+          return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
+        }
       }
     }
 
@@ -103,7 +123,6 @@ export async function POST(
       appliedCouponCode = coupon.code
     }
 
-    const quantity = parsed.data.numberOfParticipants
     const breakdown = event.isCompetition
       ? calculateCompetitionFees(event.effectiveAmount, event.groupExtraAmount, quantity, couponDiscount, event.gstEnabled, event.platformFeeEnabled)
       : calculateTicketFees(event.effectiveAmount, quantity, couponDiscount, event.gstEnabled, event.platformFeeEnabled)
@@ -116,14 +135,17 @@ export async function POST(
       amount: totalAmountPaise,
       currency: "INR",
       receipt: `pub_${event.id.slice(-8)}_${Date.now()}`,
+      // Notes let the Razorpay webhook finish the booking if the browser
+      // never reaches payment/verify. ticketCode marks a re-payment.
       notes: {
         eventId: event.id,
         eventName: event.name,
-        phone: parsed.data.phone,
-        name: parsed.data.name,
-        email: parsed.data.email ?? "",
-        age: String(parsed.data.age),
+        phone: repayTicket ? repayTicket.phone : parsed.data.phone,
+        name: repayTicket ? repayTicket.name : parsed.data.name,
+        email: repayTicket ? (repayTicket.email ?? "") : (parsed.data.email ?? ""),
+        age: String(repayTicket ? repayTicket.age : parsed.data.age),
         numberOfParticipants: String(quantity),
+        ...(repayTicket ? { ticketCode: repayTicket.ticketCode } : {}),
         ...(appliedCouponCode ? { couponCode: appliedCouponCode, couponDiscount: String(couponDiscount) } : {}),
       },
     })
@@ -137,6 +159,8 @@ export async function POST(
           currency: "INR",
           keyId,
           breakdown,
+          numberOfParticipants: quantity,
+          ...(repayTicket ? { ticketCode: repayTicket.ticketCode } : {}),
         },
       },
       { headers: corsHeaders }

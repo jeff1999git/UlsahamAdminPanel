@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import {
-  findParticipantByEventAndPhone,
+  findParticipantByEventAndOrderId,
+  findParticipantByTicketCodeOnly,
   updateParticipant,
 } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     const entity = payment?.entity as Record<string, unknown> | undefined
     const notes = entity?.notes as Record<string, string> | undefined
     const paymentId = entity?.id as string | undefined
+    const orderId = entity?.order_id as string | undefined
 
     const eventId = notes?.eventId
     const phone = notes?.phone
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
     const numberOfParticipants = notes?.numberOfParticipants
       ? parseInt(notes.numberOfParticipants, 10)
       : 1
+    const repayTicketCode = notes?.ticketCode
 
     if (!eventId || !phone) {
       console.error("[Razorpay Webhook] Missing eventId or phone in notes")
@@ -58,12 +61,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped" })
     }
 
-    const existing = await findParticipantByEventAndPhone(eventId, phone)
+    // 1) Re-payment of an existing unpaid ticket (order carried its ticketCode).
+    if (repayTicketCode) {
+      const ticket = await findParticipantByTicketCodeOnly(repayTicketCode)
+      if (!ticket || ticket.eventId !== eventId) {
+        console.error("[Razorpay Webhook] Re-payment ticket not found", { eventId, repayTicketCode })
+        return NextResponse.json({ status: "skipped" })
+      }
+      if (!ticket.amountPaid) {
+        await updateParticipant(ticket.id, {
+          amountPaid: true,
+          paymentId: paymentId ?? null,
+          paymentOrderId: ticket.paymentOrderId ?? orderId ?? null,
+        })
+        await logActivity({
+          adminUsername: "razorpay-webhook",
+          adminRole: "SYSTEM",
+          action: "PARTICIPANT_UPDATED",
+          entity: "Participant",
+          entityId: ticket.id,
+          description: `Payment confirmed via webhook: ${ticket.name} (${ticket.ticketCode}) — Payment: ${paymentId}`,
+          metadata: { eventId, phone, paymentId, orderId },
+        })
+      }
+      return NextResponse.json({ status: "ok" })
+    }
 
+    if (!orderId) {
+      console.error("[Razorpay Webhook] Missing order_id on payment entity")
+      return NextResponse.json({ status: "skipped" })
+    }
+
+    // 2) Booking for this order already exists (payment/verify ran first).
+    const existing = await findParticipantByEventAndOrderId(eventId, orderId)
     if (existing) {
-      // verifyAndEnrollAction already ran — just ensure amountPaid is true
       if (!existing.amountPaid) {
-        await updateParticipant(existing.id, { amountPaid: true })
+        await updateParticipant(existing.id, { amountPaid: true, paymentId: paymentId ?? null })
         await logActivity({
           adminUsername: "razorpay-webhook",
           adminRole: "SYSTEM",
@@ -71,40 +104,37 @@ export async function POST(request: NextRequest) {
           entity: "Participant",
           entityId: existing.id,
           description: `Payment confirmed via webhook: ${existing.name} (${existing.ticketCode}) — Payment: ${paymentId}`,
-          metadata: { eventId, phone, paymentId },
+          metadata: { eventId, phone, paymentId, orderId },
         })
       }
       return NextResponse.json({ status: "ok" })
     }
 
-    // Browser crashed before verifyAndEnrollAction ran — enroll now
+    // 3) Browser never reached payment/verify — create the booking now.
+    //    registerParticipant is idempotent on paymentOrderId, so a concurrent
+    //    verify call cannot produce a second ticket for this payment.
     if (!name || age === undefined || isNaN(age)) {
       console.error("[Razorpay Webhook] Insufficient notes data to create participant", notes)
       return NextResponse.json({ status: "skipped" })
     }
 
-    let participant
-    try {
-      const result = await registerParticipant({
-        eventId,
-        name,
-        phone,
-        email,
-        age,
-        numberOfParticipants,
-        amountPaid: true,
-      })
-      participant = result.participant
-    } catch (err) {
-      // verifyAndEnrollAction won a concurrent race — update amountPaid
-      if (err instanceof Error && err.message.includes("already registered")) {
-        const recovered = await findParticipantByEventAndPhone(eventId, phone)
-        if (recovered && !recovered.amountPaid) {
-          await updateParticipant(recovered.id, { amountPaid: true })
-        }
-        return NextResponse.json({ status: "ok" })
+    const { participant, isNew } = await registerParticipant({
+      eventId,
+      name,
+      phone,
+      email,
+      age,
+      numberOfParticipants,
+      amountPaid: true,
+      paymentOrderId: orderId,
+      paymentId: paymentId ?? null,
+    })
+
+    if (!isNew) {
+      if (!participant.amountPaid) {
+        await updateParticipant(participant.id, { amountPaid: true, paymentId: paymentId ?? null })
       }
-      throw err
+      return NextResponse.json({ status: "ok" })
     }
 
     await logActivity({
@@ -114,7 +144,7 @@ export async function POST(request: NextRequest) {
       entity: "Participant",
       entityId: participant.id,
       description: `Auto-enrolled via Razorpay webhook (browser crash recovery): ${participant.name} (${participant.ticketCode}) — Payment: ${paymentId}`,
-      metadata: { eventId, phone, paymentId },
+      metadata: { eventId, phone, paymentId, orderId },
     })
 
     return NextResponse.json({ status: "ok" })

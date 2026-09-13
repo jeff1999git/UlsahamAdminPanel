@@ -32,16 +32,43 @@ export async function findParticipantsByTicketCodes(ticketCodes: string[]) {
   })
 }
 
+/**
+ * Most recent booking for a phone number on an event. A person may hold
+ * several bookings for the same event, so this is a convenience lookup, not
+ * a uniqueness check.
+ */
 export async function findParticipantByEventAndPhone(eventId: string, phone: string) {
-  return prisma.participant.findUnique({
-    where: { eventId_phone: { eventId, phone } },
+  return prisma.participant.findFirst({
+    where: { eventId, phone },
+    orderBy: { registeredAt: "desc" },
   })
+}
+
+/** Booking created for a specific Razorpay order — the paid-booking idempotency key. */
+export async function findParticipantByEventAndOrderId(eventId: string, paymentOrderId: string) {
+  return prisma.participant.findFirst({
+    where: { eventId, paymentOrderId },
+  })
+}
+
+/** Participant row only (no event relation) for a ticket code. */
+export async function findParticipantByTicketCodeOnly(ticketCode: string) {
+  return prisma.participant.findUnique({ where: { ticketCode } })
 }
 
 export async function findTicketCodesByEmail(email: string) {
   return prisma.participant.findMany({
     where: { email: { equals: email, mode: "insensitive" } },
     select: { ticketCode: true },
+    orderBy: { registeredAt: "desc" },
+  })
+}
+
+export async function findTicketCodesByPhone(phone: string) {
+  return prisma.participant.findMany({
+    where: { phone },
+    select: { ticketCode: true },
+    orderBy: { registeredAt: "desc" },
   })
 }
 

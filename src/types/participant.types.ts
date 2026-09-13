@@ -12,6 +12,13 @@ export type CreateParticipantInput = {
   age: number
   numberOfParticipants: number
   amountPaid?: boolean
+  /**
+   * Razorpay order id for paid bookings. Makes registration idempotent: a
+   * second call with the same order id returns the booking created by the
+   * first instead of creating another ticket.
+   */
+  paymentOrderId?: string | null
+  paymentId?: string | null
 }
 
 export type UpdateParticipantInput = {
