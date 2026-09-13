@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma"
 import type { EventStatus, Prisma } from "@prisma/client"
 import type { EventListParams } from "@/types/event.types"
 import { DEFAULT_PAGE_SIZE, COMPETITION_NUMBER_BASE } from "@/constants"
+import { hasEventEnded } from "@/lib/event-time"
+
+/** Statuses the public site may see for an event that has not happened yet. */
+const PUBLIC_LIVE_STATUSES: EventStatus[] = ["PUBLISHED", "BOOKING_CLOSED"]
 
 export async function findEventById(id: string) {
   return prisma.event.findUnique({
@@ -19,7 +23,7 @@ export async function findEventBySlug(slug: string) {
 
 export async function findPublishedEventBySlug(slug: string) {
   return prisma.event.findFirst({
-    where: { slug, status: { in: ["PUBLISHED", "COMPLETED"] } },
+    where: { slug, status: { in: [...PUBLIC_LIVE_STATUSES, "COMPLETED"] } },
     include: { _count: { select: { participants: true } } },
   })
 }
@@ -76,9 +80,11 @@ export async function listPublishedEvents(params: {
 }) {
   const { page = 1, limit = 10, featured, upcoming, past } = params
 
+  // Events whose booking an admin closed stay listed on the site (they just
+  // cannot be booked), so the live listing covers PUBLISHED + BOOKING_CLOSED.
   const where: Prisma.EventWhereInput = past
     ? { status: "COMPLETED" }
-    : { status: "PUBLISHED" }
+    : { status: { in: PUBLIC_LIVE_STATUSES } }
 
   if (!past) {
     if (featured === true) where.featured = true
@@ -107,14 +113,28 @@ export async function listPublishedEvents(params: {
   return { events, total, page, totalPages: Math.ceil(total / limit) }
 }
 
+/**
+ * COMPLETED is set automatically, never by hand: an event completes once its
+ * end time (date + endTime, IST) has passed. endTime is a display string, so
+ * the comparison cannot run inside MongoDB — narrow to events whose day has
+ * begun (plus a day of slack for timezone skew) and decide in JS.
+ */
 export async function autoCompleteExpiredEvents() {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return prisma.event.updateMany({
+  const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+  const candidates = await prisma.event.findMany({
     where: {
-      date: { lt: today },
-      status: { in: ["ANNOUNCED", "PUBLISHED"] },
+      date: { lte: cutoff },
+      status: { in: ["ANNOUNCED", ...PUBLIC_LIVE_STATUSES] },
     },
+    select: { id: true, date: true, startTime: true, endTime: true },
+  })
+
+  const endedIds = candidates.filter((event) => hasEventEnded(event)).map((event) => event.id)
+  if (endedIds.length === 0) return
+
+  return prisma.event.updateMany({
+    where: { id: { in: endedIds } },
     data: { status: "COMPLETED" },
   })
 }
@@ -182,8 +202,8 @@ export async function getDashboardStats() {
     revenueAgg,
   ] = await Promise.all([
     prisma.event.count(),
-    prisma.event.count({ where: { status: "PUBLISHED" } }),
-    prisma.event.count({ where: { status: "PUBLISHED", date: { gt: now } } }),
+    prisma.event.count({ where: { status: { in: PUBLIC_LIVE_STATUSES } } }),
+    prisma.event.count({ where: { status: { in: PUBLIC_LIVE_STATUSES }, date: { gt: now } } }),
     prisma.participant.count(),
     prisma.event.findMany({
       where: { isFree: false, amount: { not: null } },

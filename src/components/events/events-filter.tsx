@@ -61,6 +61,7 @@ export function EventsFilter({ defaultSearch, defaultStatus }: EventsFilterProps
           <SelectItem value="all">All Statuses</SelectItem>
           <SelectItem value="ANNOUNCED">Announced</SelectItem>
           <SelectItem value="PUBLISHED">Published</SelectItem>
+          <SelectItem value="BOOKING_CLOSED">Booking Closed</SelectItem>
           <SelectItem value="CANCELLED">Cancelled</SelectItem>
           <SelectItem value="COMPLETED">Completed</SelectItem>
         </SelectContent>

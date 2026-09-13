@@ -17,8 +17,45 @@ import { countParticipantsForEvent, sumParticipantsForEvents } from "@/repositor
 import { deleteImage } from "@/lib/cloudinary"
 import { generateSlug } from "@/lib/slug"
 import { sanitizeString } from "@/lib/utils"
+import { hasEventEnded } from "@/lib/event-time"
+import {
+  getEffectiveStatus,
+  getBookingClosedReason,
+  getBookingClosedMessage,
+  COMPLETED_IS_AUTOMATIC,
+} from "@/lib/event-status"
 import type { CreateEventInput, UpdateEventInput, EventListParams } from "@/types/event.types"
 import type { EventStatus } from "@prisma/client"
+
+export { COMPLETED_IS_AUTOMATIC }
+
+/**
+ * Everything the public site needs to decide whether the booking form opens:
+ * the status as the visitor should see it (auto-completed when the event has
+ * ended) plus why booking is shut, if it is.
+ */
+function getPublicBookingState(
+  event: { status: EventStatus; date: Date | string; startTime: string; endTime: string },
+  isFull: boolean
+) {
+  const reason = getBookingClosedReason({ ...event, isFull })
+  return {
+    status: getEffectiveStatus(event),
+    bookingOpen: reason === null,
+    bookingClosedReason: reason,
+    bookingClosedMessage: getBookingClosedMessage(reason),
+  }
+}
+
+/** COMPLETED is derived from the clock, so it can never be chosen by hand. */
+function assertStatusIsSelectable(
+  status: EventStatus | undefined,
+  timing: { date: Date | string; startTime: string; endTime: string }
+) {
+  if (status === "COMPLETED" && !hasEventEnded(timing)) {
+    throw new Error(COMPLETED_IS_AUTOMATIC)
+  }
+}
 
 function getEffectiveAmount(event: {
   isFree: boolean
@@ -50,6 +87,7 @@ export async function getPublishedEventBySlug(slug: string) {
   const { _count, bannerImageId, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...publicFields } = event
   return {
     ...publicFields,
+    ...getPublicBookingState(event, isFull),
     registeredCount,
     isFull,
     effectiveAmount,
@@ -87,13 +125,21 @@ export async function getPublishedEvents(params: {
     const isFull = event.capacity !== null && registeredCount >= event.capacity
     const effectiveAmount = getEffectiveAmount(event)
     const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...rest } = event
-    return { ...rest, registeredCount, isFull, effectiveAmount }
+    return {
+      ...rest,
+      ...getPublicBookingState(event, isFull),
+      registeredCount,
+      isFull,
+      effectiveAmount,
+    }
   })
 
   return { ...result, events: eventsWithMeta }
 }
 
 export async function createNewEvent(input: CreateEventInput) {
+  assertStatusIsSelectable(input.status, input)
+
   const baseSlug = input.slug || generateSlug(input.name)
 
   const isCompetition = input.isCompetition ?? false
@@ -149,6 +195,12 @@ export async function createNewEvent(input: CreateEventInput) {
 export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   const existing = await findEventById(id)
   if (!existing) throw new Error("Event not found")
+
+  assertStatusIsSelectable(input.status, {
+    date: input.date ?? existing.date,
+    startTime: input.startTime ?? existing.startTime,
+    endTime: input.endTime ?? existing.endTime,
+  })
 
   const updateData: Record<string, unknown> = {}
 
@@ -246,6 +298,11 @@ export async function deleteEventWithCleanup(id: string) {
 }
 
 export async function toggleEventStatus(id: string, status: EventStatus) {
+  const existing = await findEventById(id)
+  if (!existing) throw new Error("Event not found")
+
+  assertStatusIsSelectable(status, existing)
+
   return updateEvent(id, { status })
 }
 

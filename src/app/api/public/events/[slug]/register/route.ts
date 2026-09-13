@@ -7,7 +7,6 @@ import { getPublishedEventBySlug, findEventComplimentaryCodes, incrementComplime
 import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { registerParticipant, PHONE_ALREADY_REGISTERED, EVENT_FULL } from "@/services/participant.service"
 import { validateCompetitionQuantity } from "@/lib/competition"
-import { hasEventStarted } from "@/lib/event-time"
 
 const registerBodySchema = participantSchema.extend({
   code: z.string().max(50).optional(),
@@ -68,9 +67,11 @@ export async function POST(
       )
     }
 
-    if (hasEventStarted(event)) {
+    // Booking runs until the event's end time unless an admin closed it, the
+    // event was cancelled, or every seat is taken.
+    if (event.bookingClosedReason) {
       return NextResponse.json(
-        { success: false, error: "Booking is closed — this event has already started." },
+        { success: false, error: event.bookingClosedMessage },
         { status: 410, headers: corsHeaders }
       )
     }

@@ -16,6 +16,7 @@ export const IST_TIMEZONE = "Asia/Kolkata"
 export const EVENT_STATUS_LABELS: Record<string, string> = {
   ANNOUNCED: "Announced",
   PUBLISHED: "Published",
+  BOOKING_CLOSED: "Booking Closed",
   CANCELLED: "Cancelled",
   COMPLETED: "Completed",
 }

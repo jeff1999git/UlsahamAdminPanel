@@ -66,6 +66,7 @@ model Event {
 enum EventStatus {
   ANNOUNCED
   PUBLISHED
+  BOOKING_CLOSED
   CANCELLED
   COMPLETED
 }

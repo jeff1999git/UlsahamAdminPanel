@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Trash2 } from "lucide-react"
+import { Eye, EyeOff, Lock, Unlock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
@@ -21,18 +21,25 @@ export function EventEditActions({ eventId, status, participantCount }: EventEdi
 
   const canToggle = status !== "CANCELLED" && status !== "COMPLETED"
   const isPublished = status === "PUBLISHED"
+  const isBookingClosed = status === "BOOKING_CLOSED"
 
-  function handleToggleStatus() {
-    const newStatus = isPublished ? "ANNOUNCED" : "PUBLISHED"
+  function changeStatus(newStatus: EventStatus, successMessage: string) {
     startTransition(async () => {
-      const result = await toggleEventStatusAction(eventId, newStatus as EventStatus)
+      const result = await toggleEventStatusAction(eventId, newStatus)
       if (result.success) {
-        toast.success(newStatus === "PUBLISHED" ? "Event published" : "Event unpublished")
+        toast.success(successMessage)
         router.refresh()
       } else {
         toast.error(result.error)
       }
     })
+  }
+
+  function handleToggleStatus() {
+    changeStatus(
+      isPublished ? "ANNOUNCED" : "PUBLISHED",
+      isPublished ? "Event unpublished" : "Event published"
+    )
   }
 
   async function handleDelete() {
@@ -47,7 +54,7 @@ export function EventEditActions({ eventId, status, participantCount }: EventEdi
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {canToggle && (
+      {canToggle && !isBookingClosed && (
         <Button size="sm" variant="outline" onClick={handleToggleStatus}>
           {isPublished ? (
             <>
@@ -60,6 +67,26 @@ export function EventEditActions({ eventId, status, participantCount }: EventEdi
               Publish
             </>
           )}
+        </Button>
+      )}
+      {canToggle && isPublished && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => changeStatus("BOOKING_CLOSED", "Booking closed — the event stays listed")}
+        >
+          <Lock className="h-4 w-4 mr-1.5" />
+          Close Booking
+        </Button>
+      )}
+      {canToggle && isBookingClosed && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => changeStatus("PUBLISHED", "Booking reopened")}
+        >
+          <Unlock className="h-4 w-4 mr-1.5" />
+          Reopen Booking
         </Button>
       )}
       <ConfirmDialog
