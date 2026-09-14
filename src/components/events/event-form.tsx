@@ -867,10 +867,19 @@ export function EventForm({ event }: EventFormProps) {
                         <SelectContent>
                           <SelectItem value="ANNOUNCED">Announced</SelectItem>
                           <SelectItem value="PUBLISHED">Published</SelectItem>
+                          <SelectItem value="BOOKING_CLOSED">Booking Closed</SelectItem>
                           <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                          <SelectItem value="COMPLETED">Completed</SelectItem>
+                          {/* Set by the system once the event's end time passes. */}
+                          <SelectItem value="COMPLETED" disabled>
+                            Completed (automatic)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormDescription>
+                        {field.value === "BOOKING_CLOSED"
+                          ? "Listed on the website but not bookable."
+                          : "Booking stays open until the event ends. Completed is set automatically."}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

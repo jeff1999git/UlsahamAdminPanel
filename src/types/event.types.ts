@@ -1,4 +1,5 @@
 import type { Event, EventStatus, Participant, CouponCode, ComplimentaryCode, ParticipationType, EventImage } from "@prisma/client"
+import type { BookingClosedReason } from "@/lib/event-status"
 
 export type { CouponCode, ComplimentaryCode, ParticipationType, EventImage }
 
@@ -40,6 +41,11 @@ export type PublicEvent = Pick<
   effectiveAmount: number | null
   registeredCount: number
   isFull: boolean
+  /** Auto-completed once the event's end time has passed. */
+  status: EventStatus
+  bookingOpen: boolean
+  bookingClosedReason: BookingClosedReason | null
+  bookingClosedMessage: string | null
   galleryImageUrls: string[]
 }
 

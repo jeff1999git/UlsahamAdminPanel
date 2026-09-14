@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { EventStatus, ParticipationType } from "@prisma/client"
+import { hasEventEnded } from "@/lib/event-time"
 
 const complimentaryCodeSchema = z.object({
   code: z
@@ -133,6 +134,19 @@ export const createEventSchema = baseEventSchema
     {
       message: "Extra member amount is required for paid group competitions",
       path: ["groupExtraAmount"],
+    }
+  )
+  // COMPLETED is derived from the event's end time, never picked by hand. The
+  // edit form reuses this schema, so an event that really has ended stays valid.
+  .refine(
+    (data) => {
+      if (data.status !== EventStatus.COMPLETED) return true
+      if (!data.date || !data.endTime) return false
+      return hasEventEnded({ date: data.date, startTime: data.startTime, endTime: data.endTime })
+    },
+    {
+      message: "Completed is set automatically once the event ends",
+      path: ["status"],
     }
   )
 

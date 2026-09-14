@@ -8,7 +8,6 @@ import { countParticipantsForEvent, findParticipantByTicketCodeOnly } from "@/re
 import { getRazorpay } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
-import { hasEventStarted } from "@/lib/event-time"
 
 const orderBodySchema = participantSchema.extend({
   couponCode: z.string().max(50).optional(),
@@ -61,9 +60,12 @@ export async function POST(
     if (!event) {
       return NextResponse.json({ success: false, error: "Event not found" }, { status: 404, headers: corsHeaders })
     }
-    if (hasEventStarted(event)) {
+    // An event that is over or cancelled must never take money — not even for
+    // a ticket that was created earlier and left unpaid.
+    const closedReason = event.bookingClosedReason
+    if (closedReason === "ENDED" || closedReason === "CANCELLED") {
       return NextResponse.json(
-        { success: false, error: "Booking is closed — this event has already started." },
+        { success: false, error: event.bookingClosedMessage },
         { status: 410, headers: corsHeaders }
       )
     }
@@ -87,8 +89,13 @@ export async function POST(
     const quantity = repayTicket ? repayTicket.numberOfParticipants : parsed.data.numberOfParticipants
 
     if (!repayTicket) {
-      if (event.isFull) {
-        return NextResponse.json({ success: false, error: "Event is full" }, { status: 410, headers: corsHeaders })
+      // Closed or full only blocks NEW bookings; an existing unpaid ticket
+      // already holds its seats and must stay payable.
+      if (closedReason) {
+        return NextResponse.json(
+          { success: false, error: event.bookingClosedMessage },
+          { status: 410, headers: corsHeaders }
+        )
       }
 
       const quantityError = validateCompetitionQuantity(event, quantity)

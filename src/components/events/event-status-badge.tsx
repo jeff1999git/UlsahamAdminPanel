@@ -7,6 +7,7 @@ const statusConfig: Record<
 > = {
   ANNOUNCED: { label: "Announced", variant: "warning" },
   PUBLISHED: { label: "Published", variant: "success" },
+  BOOKING_CLOSED: { label: "Booking Closed", variant: "muted" },
   CANCELLED: { label: "Cancelled", variant: "destructive" },
   COMPLETED: { label: "Completed", variant: "secondary" },
 }
