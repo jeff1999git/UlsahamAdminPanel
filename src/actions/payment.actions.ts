@@ -3,7 +3,7 @@
 import crypto from "crypto"
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import { getRazorpay } from "@/lib/razorpay"
+import { getRazorpay, fetchOrderBooking, type OrderBooking } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
 import { findEventById } from "@/repositories/event.repository"
@@ -104,7 +104,9 @@ export async function verifyAndEnrollAction(
     razorpay_signature: string
   },
   eventId: string,
-  formData: Record<string, unknown>
+  // Still passed by the enrol dialog, but no longer trusted: the booking is
+  // written from the order's notes.
+  _formData: Record<string, unknown>
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
 
@@ -118,17 +120,36 @@ export async function verifyAndEnrollAction(
     return { success: false, error: "Payment verification failed. Please contact support." }
   }
 
-  const parsed = participantSchema.safeParse(formData)
-  if (!parsed.success) return { success: false, error: "Invalid form data" }
+  // The signature proves only that this payment belongs to this order. The
+  // event, seats and buyer come from the notes createPaymentOrderAction wrote,
+  // so a payment for one enrolment cannot be replayed into another.
+  let booking: OrderBooking | null
+  try {
+    booking = await fetchOrderBooking(paymentData.razorpay_order_id)
+  } catch {
+    return {
+      success: false,
+      error: "Could not confirm the payment with Razorpay yet. If money was taken, the booking will be completed automatically.",
+    }
+  }
+  // Orders that settle an unpaid ticket come from the customer site and are
+  // completed there or by the webhook, never by a staff enrolment.
+  if (!booking || booking.kind !== "new" || booking.eventId !== eventId) {
+    return { success: false, error: "This payment does not match this enrolment. Please contact support with the payment ID." }
+  }
 
   try {
     // Idempotent on the Razorpay order id: if the webhook already enrolled
     // this order, the existing booking is returned instead of a second one.
     const { participant, isNew } = await registerParticipant({
       eventId,
-      ...parsed.data,
-      email: parsed.data.email || null,
+      name: booking.name,
+      phone: booking.phone,
+      email: booking.email,
+      age: booking.age,
+      numberOfParticipants: booking.numberOfParticipants,
       amountPaid: true,
+      entryType: "PAID",
       paymentOrderId: paymentData.razorpay_order_id,
       paymentId: paymentData.razorpay_payment_id,
     })

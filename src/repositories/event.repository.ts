@@ -3,6 +3,7 @@ import type { EventStatus, Prisma } from "@prisma/client"
 import type { EventListParams } from "@/types/event.types"
 import { DEFAULT_PAGE_SIZE, COMPETITION_NUMBER_BASE } from "@/constants"
 import { hasEventEnded } from "@/lib/event-time"
+import { entryStatusOf } from "@/lib/entry-type"
 
 /** Statuses the public site may see for an event that has not happened yet. */
 const PUBLIC_LIVE_STATUSES: EventStatus[] = ["PUBLISHED", "BOOKING_CLOSED"]
@@ -211,17 +212,17 @@ export async function getDashboardStats() {
         amount: true,
         participants: {
           where: { amountPaid: true },
-          select: { numberOfParticipants: true },
+          select: { numberOfParticipants: true, amountPaid: true, entryType: true, paymentId: true, paymentOrderId: true },
         },
       },
     }),
   ])
 
+  // Complimentary entries bring in no money, so only paid bookings count.
   const totalRevenue = revenueAgg.reduce((sum, event) => {
-    const eventRevenue = event.participants.reduce(
-      (s, p) => s + p.numberOfParticipants * (event.amount ?? 0),
-      0
-    )
+    const eventRevenue = event.participants
+      .filter((p) => entryStatusOf(p, false) === "PAID")
+      .reduce((s, p) => s + p.numberOfParticipants * (event.amount ?? 0), 0)
     return sum + eventRevenue
   }, 0)
 

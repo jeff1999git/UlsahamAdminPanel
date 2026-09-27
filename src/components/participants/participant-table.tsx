@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Badge, type BadgeProps } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -46,15 +46,33 @@ import { ParticipantForm } from "@/components/participants/participant-form"
 import {
   deleteParticipantAction,
   toggleAttendanceAction,
-  toggleAmountPaidAction,
   exportParticipantsAction,
 } from "@/actions/participant.actions"
 import { formatDate, formatDateTime } from "@/lib/utils"
+import { entryStatusOf, ENTRY_STATUS_LABELS, type EntryStatus } from "@/lib/entry-type"
 import type { Participant } from "@prisma/client"
+
+const ENTRY_BADGE_VARIANT: Record<EntryStatus, BadgeProps["variant"]> = {
+  PAID: "success",
+  COMPLIMENTARY: "secondary",
+  FREE: "info",
+  UNPAID: "muted",
+}
+
+/** How the booking was made on the site — read-only, never edited here. */
+function EntryTypeBadge({ status, className }: { status: EntryStatus; className?: string }) {
+  return (
+    <Badge variant={ENTRY_BADGE_VARIANT[status]} className={className ?? "text-xs"}>
+      {ENTRY_STATUS_LABELS[status]}
+    </Badge>
+  )
+}
 
 interface ParticipantTableProps {
   participants: Participant[]
   eventId: string
+  /** Free events have no payments; older bookings on them show as Free. */
+  eventIsFree: boolean
   totalCount: number
   eventName: string
   eventDate: string
@@ -68,6 +86,7 @@ interface ParticipantTableProps {
 export function ParticipantTable({
   participants,
   eventId,
+  eventIsFree,
   totalCount,
   eventName,
   eventDate,
@@ -120,17 +139,6 @@ export function ParticipantTable({
     })
   }
 
-  function handleToggleAmountPaid(id: string, currentPaid: boolean) {
-    startTransition(async () => {
-      const result = await toggleAmountPaidAction(id, eventId, !currentPaid)
-      if (result.success) {
-        toast.success(result.data.amountPaid ? "Payment marked" : "Payment unmarked")
-      } else {
-        toast.error(result.error)
-      }
-    })
-  }
-
   async function handleExportXLSX() {
     try {
       const all = await exportParticipantsAction(eventId)
@@ -142,7 +150,7 @@ export function ParticipantTable({
         "Email": p.email ?? "",
         "Age": p.age,
         "No. of Participants": p.numberOfParticipants,
-        "Amount Paid": p.amountPaid ? "Yes" : "No",
+        "Entry Type": ENTRY_STATUS_LABELS[entryStatusOf(p, eventIsFree)],
         "Attended": p.attended ? "Yes" : "No",
         "Attended At": p.attendedAt ? formatDateTime(p.attendedAt) : "",
         "Registered At": formatDateTime(p.registeredAt),
@@ -175,10 +183,10 @@ export function ParticipantTable({
         <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-[#014421]/30 bg-[#014421]/5">
           <div>
             <p className="text-sm font-semibold text-black">
-              {attendanceMode ? "Attendance Mode" : "Payment Mode"}
+              {attendanceMode ? "Attendance Mode" : "Entry Type"}
             </p>
             <p className="text-xs text-black/50">
-              {attendanceMode ? "Checkboxes mark attendance" : "Checkboxes mark payment"}
+              {attendanceMode ? "Checkboxes mark attendance" : "How each booking was made"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -186,7 +194,7 @@ export function ParticipantTable({
             <Switch
               checked={attendanceMode}
               onCheckedChange={setAttendanceMode}
-              aria-label="Toggle between payment and attendance mode"
+              aria-label="Toggle between entry type and attendance mode"
             />
             <UserCheck className="h-4 w-4 text-[#014421]" />
           </div>
@@ -243,7 +251,7 @@ export function ParticipantTable({
                         </div>
                       </div>
 
-                      {/* Checkbox — payment mode or attendance mode */}
+                      {/* Entry type, or the attendance checkbox in attendance mode */}
                       <div
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -261,20 +269,8 @@ export function ParticipantTable({
                           ) : (
                             <span className="text-[9px] text-black/40 font-medium px-2">Unpaid</span>
                           )
-                        ) : isSuperAdmin ? (
-                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#014421] border border-[#014421] cursor-pointer">
-                            <Checkbox
-                              checked={p.amountPaid ?? false}
-                              onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
-                              aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
-                              className="h-4 w-4 bg-white border-white data-[state=checked]:bg-white data-[state=checked]:border-white [&_svg]:text-[#014421]"
-                            />
-                            <span className="text-xs font-semibold text-white leading-none">Paid</span>
-                          </label>
                         ) : (
-                          p.amountPaid
-                            ? <span className="text-[9px] text-emerald-600 font-semibold px-2">Paid</span>
-                            : <span className="text-[9px] text-black/40 font-medium px-2">Unpaid</span>
+                          <EntryTypeBadge status={entryStatusOf(p, eventIsFree)} className="text-[10px] px-2" />
                         )}
                       </div>
 
@@ -295,7 +291,7 @@ export function ParticipantTable({
                   <TableHead>Ticket Code</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Participants</TableHead>
-                  <TableHead>Paid</TableHead>
+                  <TableHead>Entry Type</TableHead>
                   <TableHead>Attendance</TableHead>
                   <TableHead>Registered</TableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
@@ -329,20 +325,7 @@ export function ParticipantTable({
                       {p.numberOfParticipants}
                     </TableCell>
                     <TableCell>
-                      {isSuperAdmin ? (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={p.amountPaid ?? false}
-                            onCheckedChange={() => handleToggleAmountPaid(p.id, p.amountPaid ?? false)}
-                            aria-label={p.amountPaid ? "Unmark payment" : "Mark as paid"}
-                            className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                          />
-                        </div>
-                      ) : (
-                        p.amountPaid
-                          ? <Badge variant="success" className="text-xs">Paid</Badge>
-                          : <Badge variant="muted" className="text-xs">Unpaid</Badge>
-                      )}
+                      <EntryTypeBadge status={entryStatusOf(p, eventIsFree)} />
                     </TableCell>
                     <TableCell>
                       {p.attended ? (
@@ -510,14 +493,10 @@ export function ParticipantTable({
                 )}
               </div>
 
-              {/* Payment status in detail */}
+              {/* Entry type in detail */}
               <div className="flex items-center gap-2.5">
                 <Banknote className="h-4 w-4 text-black/40 shrink-0" />
-                {selectedMobile.amountPaid ? (
-                  <Badge variant="success" className="text-xs">Amount Paid</Badge>
-                ) : (
-                  <Badge variant="destructive" className="text-xs">Payment Pending</Badge>
-                )}
+                <EntryTypeBadge status={entryStatusOf(selectedMobile, eventIsFree)} />
               </div>
 
               {/* Actions */}

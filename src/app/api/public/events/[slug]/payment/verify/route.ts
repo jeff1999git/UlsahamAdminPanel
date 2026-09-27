@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
+import { fetchOrderBooking, type OrderBooking } from "@/lib/razorpay"
 import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug } from "@/services/event.service"
 import { findParticipantByTicketCodeOnly, updateParticipant } from "@/repositories/participant.repository"
@@ -11,6 +12,8 @@ const verifySchema = z.object({
   razorpay_order_id: z.string().min(1),
   razorpay_payment_id: z.string().min(1),
   razorpay_signature: z.string().min(1),
+  // The site still sends the buyer and the seat count. They are checked for
+  // shape only; the booking is written from the order's notes, never from these.
   name: z.string().min(2).max(100),
   phone: z.string().regex(/^\d{10}$/),
   email: z.string().email().optional().nullable().or(z.literal("")),
@@ -95,18 +98,44 @@ export async function POST(
     )
   }
 
+  const { razorpay_payment_id, razorpay_order_id } = parsed.data
+  const ids = { paymentId: razorpay_payment_id, orderId: razorpay_order_id }
+
+  // The signature proves only that this payment belongs to this order. What the
+  // order paid for — the event, the seats, the buyer and any ticket it settles —
+  // is read from the notes written when the order was created, never from this
+  // request. Otherwise one real payment could be replayed for any event or any
+  // number of seats.
+  let booking: OrderBooking | null
+  try {
+    booking = await fetchOrderBooking(razorpay_order_id)
+  } catch (error) {
+    console.error("Public payment verify: could not fetch the order", error)
+    // The Razorpay webhook completes the booking from the same notes.
+    return NextResponse.json(
+      { success: false, error: "We could not confirm your payment yet. If money was taken, your booking will be completed automatically — please check My Bookings shortly." },
+      { status: 502, headers: corsHeaders }
+    )
+  }
+
   try {
     const event = await getPublishedEventBySlug(slug)
     if (!event) {
       return NextResponse.json({ success: false, error: "Event not found" }, { status: 404, headers: corsHeaders })
     }
 
-    const { razorpay_payment_id, razorpay_order_id, name, phone, email, age, numberOfParticipants, ticketCode } = parsed.data
-    const ids = { paymentId: razorpay_payment_id, orderId: razorpay_order_id }
+    const requestedTicket = parsed.data.ticketCode?.trim().toUpperCase() || null
+    const settledTicket = booking?.kind === "repay" ? booking.ticketCode : null
+    if (!booking || booking.eventId !== event.id || (requestedTicket && requestedTicket !== settledTicket)) {
+      return NextResponse.json(
+        { success: false, error: "This payment does not match this booking. Please contact support with your payment ID." },
+        { status: 400, headers: corsHeaders }
+      )
+    }
 
-    // 1) Re-payment: settle the specific unpaid ticket this order was created for.
-    if (ticketCode) {
-      const existing = await findParticipantByTicketCodeOnly(ticketCode.toUpperCase())
+    // 1) Re-payment: settle the one unpaid ticket this order was created for.
+    if (booking.kind === "repay") {
+      const existing = await findParticipantByTicketCodeOnly(booking.ticketCode)
       if (!existing || existing.eventId !== event.id) {
         return NextResponse.json(
           { success: false, error: "Ticket not found. Please contact support with your payment ID." },
@@ -117,6 +146,7 @@ export async function POST(
         ? existing
         : await updateParticipant(existing.id, {
             amountPaid: true,
+            entryType: "PAID",
             paymentId: razorpay_payment_id,
             paymentOrderId: existing.paymentOrderId ?? razorpay_order_id,
           })
@@ -130,18 +160,19 @@ export async function POST(
     //    order (client retry, webhook race) returns the booking it created.
     const { participant, isNew } = await registerParticipant({
       eventId: event.id,
-      name,
-      phone,
-      email: email || null,
-      age,
-      numberOfParticipants,
+      name: booking.name,
+      phone: booking.phone,
+      email: booking.email,
+      age: booking.age,
+      numberOfParticipants: booking.numberOfParticipants,
       amountPaid: true,
+      entryType: "PAID",
       paymentOrderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
     })
 
     if (!participant.amountPaid) {
-      await updateParticipant(participant.id, { amountPaid: true, paymentId: razorpay_payment_id })
+      await updateParticipant(participant.id, { amountPaid: true, entryType: "PAID", paymentId: razorpay_payment_id })
     }
 
     return NextResponse.json(

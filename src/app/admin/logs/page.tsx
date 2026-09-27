@@ -1,4 +1,6 @@
 import { Suspense } from "react"
+import { redirect } from "next/navigation"
+import { auth } from "@/lib/auth"
 import { Pagination } from "@/components/shared/data-table"
 import { TableSkeleton } from "@/components/shared/skeleton-loaders"
 import { listActivityLogs, pruneOldActivityLogs } from "@/repositories/activity-log.repository"
@@ -67,6 +69,9 @@ export default async function LogsPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  const session = await auth()
+  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+
   const params = await searchParams
 
   return (

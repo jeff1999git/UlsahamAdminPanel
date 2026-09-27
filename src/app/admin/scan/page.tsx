@@ -1,9 +1,14 @@
+import { redirect } from "next/navigation"
+import { auth } from "@/lib/auth"
 import { GlobalQRScanner } from "@/components/participants/global-qr-scanner"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = { title: "QR Scanner" }
 
-export default function ScanPage() {
+export default async function ScanPage() {
+  const session = await auth()
+  if ((session?.user as { role?: string })?.role === "USER") redirect("/admin/events")
+
   return (
     <div className="space-y-6 max-w-lg mx-auto">
       <div>

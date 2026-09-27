@@ -16,6 +16,8 @@ function isAdminRestrictedPath(pathname: string) {
   return false
 }
 
+const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60
+
 export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/login",
@@ -23,7 +25,7 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60,
+    maxAge: SESSION_MAX_AGE_SECONDS,
   },
   cookies: {
     sessionToken: {
@@ -70,7 +72,15 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id
         token.role = user.role
         token.username = user.name as string
+        token.loginAt = Date.now()
       }
+      // The middleware re-issues the session cookie with a fresh expiry on every
+      // request, so maxAge alone would let an active session — including one
+      // whose account has since been deactivated — live forever. A session
+      // therefore ends 24 h after sign-in however busy it is. Tokens issued
+      // before this rule are stamped the first time they are seen.
+      if (typeof token.loginAt !== "number") token.loginAt = Date.now()
+      if (Date.now() - (token.loginAt as number) > SESSION_MAX_AGE_SECONDS * 1000) return null
       return token
     },
     session({ session, token }) {

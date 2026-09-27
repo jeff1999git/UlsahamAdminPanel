@@ -8,7 +8,6 @@ import {
   updateExistingParticipant,
   deleteParticipantWithCleanup,
   toggleAttendance,
-  toggleAmountPaid,
   getAllParticipants,
   getParticipants,
   scanGlobal,
@@ -18,6 +17,7 @@ import {
 } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
 import { findParticipantByEventAndPhone } from "@/repositories/participant.repository"
+import { findEventById } from "@/repositories/event.repository"
 import type { ActionResult } from "@/types"
 import type { Participant } from "@prisma/client"
 import type { ParticipantListParams } from "@/types/participant.types"
@@ -37,6 +37,13 @@ export async function addParticipantAction(
 ): Promise<ActionResult<Participant>> {
   const session = await getSession()
 
+  // USER accounts enrol at the counter: a free event is added directly, a paid
+  // one must go through Razorpay (createPaymentOrderAction), never through here.
+  if (session.role === "USER") {
+    const event = await findEventById(eventId)
+    if (!event || !(event.isFree || !event.amount)) return { success: false, error: "Forbidden" }
+  }
+
   const parsed = participantSchema.safeParse(formData)
   if (!parsed.success) {
     const errors = parsed.error.flatten().fieldErrors
@@ -49,6 +56,9 @@ export async function addParticipantAction(
       eventId,
       ...parsed.data,
       email: parsed.data.email || null,
+      // Everyone added from the admin panel enters as complimentary.
+      amountPaid: true,
+      entryType: "COMPLIMENTARY",
     })
 
     await logActivity({
@@ -167,35 +177,6 @@ export async function toggleAttendanceAction(
     return { success: true, data: participant }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to update attendance"
-    return { success: false, error: msg }
-  }
-}
-
-export async function toggleAmountPaidAction(
-  id: string,
-  eventId: string,
-  amountPaid: boolean
-): Promise<ActionResult<Participant>> {
-  const session = await getSession()
-  if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
-
-  try {
-    const participant = await toggleAmountPaid(id, amountPaid)
-
-    await logActivity({
-      adminUsername: session.username,
-      adminRole: session.role,
-      action: "PARTICIPANT_UPDATED",
-      entity: "Participant",
-      entityId: id,
-      description: `${amountPaid ? "Marked" : "Unmarked"} payment for ${participant.name}`,
-      metadata: { eventId },
-    })
-
-    revalidatePath(`/admin/events/${eventId}/participants`)
-    return { success: true, data: participant }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Failed to update payment status"
     return { success: false, error: msg }
   }
 }
@@ -432,6 +413,9 @@ export async function bulkAddParticipantsAction(
         email: row.email || null,
         age: row.age,
         numberOfParticipants: row.numberOfParticipants,
+        // Everyone added from the admin panel enters as complimentary.
+        amountPaid: true,
+        entryType: "COMPLIMENTARY",
       })
       result.added++
     } catch (error) {
@@ -460,12 +444,16 @@ export async function bulkAddParticipantsAction(
   return { success: true, data: result }
 }
 
+// Participant lists carry every attendee's phone and email. USER accounts are
+// kept off the participants page, so they are kept off its data as well.
 export async function exportParticipantsAction(eventId: string) {
-  await getSession()
+  const session = await getSession()
+  if (session.role === "USER") throw new Error("Forbidden")
   return getAllParticipants(eventId)
 }
 
 export async function getParticipantsAction(params: ParticipantListParams) {
-  await getSession()
+  const session = await getSession()
+  if (session.role === "USER") throw new Error("Forbidden")
   return getParticipants(params)
 }
