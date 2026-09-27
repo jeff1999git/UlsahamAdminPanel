@@ -19,14 +19,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar username={username} role={role} />
+      <Sidebar role={role} />
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <Header username={username} role={role} />
         <main className="flex-1 p-4 sm:p-6 pb-24 lg:pb-6">{children}</main>
       </div>
 
-      <MobileNav username={username} role={role} />
+      <MobileNav role={role} />
     </div>
   )
 }

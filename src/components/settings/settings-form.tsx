@@ -18,6 +18,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { settingsSchema, type SettingsFormValues } from "@/validators/settings.validator"
 import { updateSettingsAction } from "@/actions/settings.actions"
+import { ACTION_FAILED_MESSAGE } from "@/constants"
 
 interface SettingsFormProps {
   initialValues: {
@@ -50,12 +51,16 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
   const isSubmitting = form.formState.isSubmitting
 
   async function onSubmit(values: SettingsFormValues) {
-    const result = await updateSettingsAction(values)
-    if (!result.success) {
-      toast.error(result.error)
-      return
+    try {
+      const result = await updateSettingsAction(values)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success("Settings updated successfully")
+    } catch {
+      toast.error(ACTION_FAILED_MESSAGE)
     }
-    toast.success("Settings updated successfully")
   }
 
   return (

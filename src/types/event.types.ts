@@ -3,15 +3,78 @@ import type { BookingClosedReason } from "@/lib/event-status"
 
 export type { CouponCode, ComplimentaryCode, ParticipationType, EventImage }
 
-export type EventWithParticipantCount = Event & {
-  _count: { participants: number }
-  registeredCount: number
+/**
+ * One row of the admin events list: only the fields EventTable and
+ * EnrollDialog read. The list is rendered by client components, so every
+ * field here reaches the browser of every staff role; coupon and
+ * complimentary codes must never be added. The edit page loads the full event.
+ */
+export type AdminEventListItem = Pick<
+  Event,
+  | "id"
+  | "name"
+  | "date"
+  | "startTime"
+  | "endTime"
+  | "venue"
+  | "bannerImageUrl"
+  | "status"
+  | "isFree"
+  | "amount"
+  | "earlyBirdAmount"
+  | "isEarlyBird"
+  | "isCompetition"
+  | "participationType"
+  | "groupExtraAmount"
+  | "gstEnabled"
+  | "platformFeeEnabled"
+> & {
+  /** Seat counts are left out for USER accounts. */
+  capacity?: number | null
+  registeredCount?: number
 }
 
 export type EventWithParticipants = Event & {
   participants: Participant[]
 }
 
+/**
+ * One event in the public list (GET /api/public/events): exactly the fields the
+ * site's cards, runner and coverflow read. Capacity and seat counts are used
+ * server-side for isFull only; descriptions and pricing detail stay on the
+ * detail endpoint.
+ */
+export type PublicEventListItem = Pick<
+  Event,
+  | "id"
+  | "name"
+  | "slug"
+  | "bannerImageUrl"
+  | "venue"
+  | "venueLink"
+  | "date"
+  | "startTime"
+  | "endTime"
+  | "isFree"
+  | "amount"
+  | "earlyBirdAmount"
+  | "isEarlyBird"
+  | "isCompetition"
+  | "participationType"
+  | "featured"
+> & {
+  /** Auto-completed once the event's end time has passed. */
+  status: EventStatus
+  isFull: boolean
+  bookingOpen: boolean
+  bookingClosedReason: BookingClosedReason | null
+}
+
+/**
+ * The event detail the public site reads (GET /api/public/events/[slug]),
+ * built field by field by toPublicEvent so a new Event column stays private
+ * until it is added here.
+ */
 export type PublicEvent = Pick<
   Event,
   | "id"
@@ -91,7 +154,7 @@ export type EventListParams = {
 }
 
 export type EventListResult = {
-  events: EventWithParticipantCount[]
+  events: AdminEventListItem[]
   total: number
   page: number
   totalPages: number

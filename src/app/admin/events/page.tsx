@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { Suspense } from "react"
+import { after } from "next/server"
 import Link from "next/link"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,8 +10,12 @@ import { Pagination } from "@/components/shared/data-table"
 import { TableSkeleton } from "@/components/shared/skeleton-loaders"
 import { getEvents } from "@/services/event.service"
 import { pruneOldEventParticipants } from "@/repositories/participant.repository"
+import { runThrottled } from "@/lib/ratelimit"
+import { parsePositiveInt } from "@/lib/query-params"
+import { EVENT_STATUS_LABELS } from "@/constants"
 import type { Metadata } from "next"
 import type { EventStatus } from "@prisma/client"
+import type { AdminEventListItem } from "@/types/event.types"
 
 export const metadata: Metadata = { title: "Events" }
 
@@ -21,12 +26,17 @@ interface SearchParams {
 }
 
 async function EventsList({ searchParams, isUser, isSuperAdmin }: { searchParams: SearchParams; isUser: boolean; isSuperAdmin: boolean }) {
-  const page = parseInt(searchParams.page ?? "1")
+  // Hand-edited URLs: a non-numeric page reads page 1, and an unknown status
+  // lists every status, instead of either reaching Prisma and failing.
+  const page = parsePositiveInt(searchParams.page, 1, 1000)
   const search = searchParams.search ?? ""
   const statusParam = searchParams.status ?? ""
-  const status = (statusParam === "all" ? "" : statusParam) as EventStatus | ""
+  const status = Object.keys(EVENT_STATUS_LABELS).includes(statusParam)
+    ? (statusParam as EventStatus)
+    : ""
 
-  pruneOldEventParticipants().catch(() => {})
+  // Housekeeping after the page is sent, at most once an hour across instances.
+  after(() => runThrottled("prune-event-participants", 60 * 60, pruneOldEventParticipants))
 
   const { events, total, totalPages } = await getEvents({
     page,
@@ -37,13 +47,18 @@ async function EventsList({ searchParams, isUser, isSuperAdmin }: { searchParams
     sortOrder: "desc",
   })
 
+  // USER accounts are never shown seat counts, so they are not sent to them either.
+  const rows: AdminEventListItem[] = isUser
+    ? events.map(({ registeredCount, capacity, ...event }) => event)
+    : events
+
   const currentParams: Record<string, string> = {}
   if (search) currentParams.search = search
   if (status) currentParams.status = statusParam
 
   return (
     <div className="space-y-4">
-      <EventTable events={events} isUser={isUser} isSuperAdmin={isSuperAdmin} />
+      <EventTable events={rows} isUser={isUser} isSuperAdmin={isSuperAdmin} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-black">
           {total} event{total !== 1 ? "s" : ""} total
@@ -91,7 +106,9 @@ export default async function EventsPage({
         <EventsFilter defaultSearch={params.search} defaultStatus={params.status} />
       </Suspense>
 
-      <Suspense fallback={<TableSkeleton rows={5} cols={1} />}>
+      {/* Keyed by the query, so a new filter or page shows the skeleton
+          instead of leaving the old list on screen while it loads. */}
+      <Suspense key={JSON.stringify(params)} fallback={<TableSkeleton rows={5} cols={1} toolbar={false} />}>
         <EventsList searchParams={params} isUser={isUser} isSuperAdmin={isSuperAdmin} />
       </Suspense>
     </div>

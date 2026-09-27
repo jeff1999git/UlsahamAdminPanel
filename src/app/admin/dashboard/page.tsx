@@ -16,7 +16,7 @@ import { ActivityFeed } from "@/components/admin/activity-feed"
 import { DashboardSkeleton } from "@/components/shared/skeleton-loaders"
 import { getDashboardStats } from "@/services/event.service"
 import { getRecentActivityLogs } from "@/repositories/activity-log.repository"
-import { formatCurrency } from "@/lib/utils"
+import { Amount } from "@/components/shared/rupee"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = { title: "Dashboard" }
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   const isSuperAdmin = role === "SUPER_ADMIN"
 
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Suspense fallback={<DashboardSkeleton cards={isSuperAdmin ? 5 : 4} />}>
       <DashboardContent isSuperAdmin={isSuperAdmin} />
     </Suspense>
   )
@@ -75,7 +75,7 @@ async function DashboardContent({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         {isSuperAdmin && (
           <StatsCard
             title="Revenue"
-            value={formatCurrency(stats.totalRevenue)}
+            value={<Amount value={stats.totalRevenue} />}
             icon={DollarSign}
             description="From paid events"
             iconClassName="bg-[#014421]/10"

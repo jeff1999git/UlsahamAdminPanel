@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import dynamic from "next/dynamic"
 import Image from "next/image"
 import { Plus, Trash2, Loader2, Upload, Building2 } from "lucide-react"
 import { toast } from "sonner"
@@ -17,9 +18,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
-import { LogoCropDialog } from "@/components/settings/logo-crop-dialog"
 import { addBrandPartnerAction, removeBrandPartnerAction } from "@/actions/settings.actions"
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_MB } from "@/constants"
+import {
+  ACTION_FAILED_MESSAGE,
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_SIZE_MB,
+  WEBSITE_UPDATE_NOTE_PARTNERS,
+} from "@/constants"
+
+// The cropper (react-image-crop and its CSS) is only needed once a logo file
+// has been picked, so it loads on demand.
+const LogoCropDialog = dynamic(
+  () => import("@/components/settings/logo-crop-dialog").then((m) => m.LogoCropDialog),
+  { ssr: false }
+)
 
 interface Partner {
   id: string
@@ -73,7 +85,12 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
   }
 
   function handleDialogOpenChange(open: boolean) {
-    if (!open) resetDialog()
+    if (open) {
+      // Fetch the cropper while the name is typed, before a logo is picked.
+      import("@/components/settings/logo-crop-dialog").catch(() => {})
+    } else {
+      resetDialog()
+    }
     setDialogOpen(open)
   }
 
@@ -148,7 +165,7 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
         ...prev,
         { id: result.data.id, name: name.trim(), logoUrl: url, logoId: publicId },
       ])
-      toast.success(`${name.trim()} added as brand partner`)
+      toast.success(`${name.trim()} added as brand partner`, { description: WEBSITE_UPDATE_NOTE_PARTNERS })
       handleDialogOpenChange(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add partner")
@@ -158,13 +175,17 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
   }
 
   async function handleRemove(partner: Partner) {
-    const result = await removeBrandPartnerAction(partner.id, partner.logoId)
-    if (!result.success) {
-      toast.error(result.error)
-      return
+    try {
+      const result = await removeBrandPartnerAction(partner.id, partner.logoId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setPartners((prev) => prev.filter((p) => p.id !== partner.id))
+      toast.success(`${partner.name} removed`, { description: WEBSITE_UPDATE_NOTE_PARTNERS })
+    } catch {
+      toast.error(ACTION_FAILED_MESSAGE)
     }
-    setPartners((prev) => prev.filter((p) => p.id !== partner.id))
-    toast.success(`${partner.name} removed`)
   }
 
   return (
@@ -319,6 +340,7 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
                       src={partner.logoUrl}
                       alt={partner.name}
                       fill
+                      sizes="160px"
                       className="object-contain p-2"
                     />
                   </div>
@@ -329,7 +351,7 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
                     trigger={
                       <button
                         type="button"
-                        className="absolute top-2 right-2 p-1 rounded-full bg-white border text-black/40 hover:text-red-600 hover:border-red-200 opacity-0 group-hover:opacity-100 transition-all"
+                        className="absolute top-2 right-2 p-1 rounded-full bg-white border text-black/40 hover:text-red-600 hover:border-red-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-all"
                         aria-label={`Remove ${partner.name}`}
                       >
                         <Trash2 className="h-3 w-3" />

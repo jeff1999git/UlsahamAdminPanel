@@ -1,5 +1,3 @@
-import { jsPDF } from "jspdf"
-
 const GREEN = "#014421"
 
 export type ParticipationCardData = {
@@ -15,11 +13,23 @@ export type ParticipationCardData = {
 }
 
 /**
+ * Starts fetching the jsPDF chunk ahead of a download click. Safe to call more
+ * than once; a failed fetch is ignored here and surfaces on the real download.
+ */
+export function preloadParticipationCardPdf() {
+  import("jspdf").catch(() => {})
+}
+
+/**
  * Generates the competition participation card as a plain-document PDF:
  * chest number + participant/event details written out, followed by the
  * competition instructions/notes when present. No ticket artwork.
+ *
+ * jsPDF is loaded on demand, so callers must await this: it rejects when the
+ * chunk cannot be fetched (offline, or a tab left open across a deploy).
  */
-export function downloadParticipationCardPdf(data: ParticipationCardData, filename: string) {
+export async function downloadParticipationCardPdf(data: ParticipationCardData, filename: string) {
+  const { jsPDF } = await import("jspdf")
   const doc = new jsPDF({ unit: "mm", format: "a4" })
   const pageW = 210
   const pageH = 297

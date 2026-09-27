@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { paymentOrderRateLimit, getClientIP } from "@/lib/ratelimit"
+import { paymentOrderRateLimit, allow, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { participantSchema } from "@/validators/participant.validator"
 import { getPublishedEventBySlug, findEventCoupons } from "@/services/event.service"
@@ -27,8 +27,7 @@ export async function POST(
   const corsHeaders = getCorsHeaders(origin)
 
   const ip = getClientIP(request)
-  const { success: rateLimitOk } = await paymentOrderRateLimit.limit(ip)
-  if (!rateLimitOk) {
+  if (!(await allow(paymentOrderRateLimit, ip))) {
     return NextResponse.json(
       { success: false, error: "Too many requests. Please try again later." },
       { status: 429, headers: corsHeaders }

@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { prisma } from "@/lib/prisma"
 import type { EventStatus, Prisma } from "@prisma/client"
 import type { EventListParams } from "@/types/event.types"
@@ -8,12 +9,23 @@ import { entryStatusOf } from "@/lib/entry-type"
 /** Statuses the public site may see for an event that has not happened yet. */
 const PUBLIC_LIVE_STATUSES: EventStatus[] = ["PUBLISHED", "BOOKING_CLOSED"]
 
-export async function findEventById(id: string) {
+const OBJECT_ID = /^[a-f\d]{24}$/i
+
+/**
+ * One read per request: a page's generateMetadata and the page itself both
+ * ask for the event, and cache() shares the result within that render.
+ * Outside a render (server actions, route handlers) it calls straight through,
+ * so writes always read fresh data. `_count` feeds the edit page's delete
+ * warning and deleteEventWithCleanup.
+ */
+export const findEventById = cache(async (id: string) => {
+  // A malformed id (a mistyped URL) is no event, not a Prisma error.
+  if (!OBJECT_ID.test(id)) return null
   return prisma.event.findUnique({
     where: { id },
     include: { _count: { select: { participants: true } } },
   })
-}
+})
 
 export async function findEventBySlug(slug: string) {
   return prisma.event.findUnique({
@@ -25,11 +37,37 @@ export async function findEventBySlug(slug: string) {
 export async function findPublishedEventBySlug(slug: string) {
   return prisma.event.findFirst({
     where: { slug, status: { in: [...PUBLIC_LIVE_STATUSES, "COMPLETED"] } },
-    include: { _count: { select: { participants: true } } },
   })
 }
 
-export async function listEvents(params: EventListParams) {
+/**
+ * Fields the admin events list needs (see AdminEventListItem), plus
+ * archivedParticipantCount for the registered count. Selecting them keeps the
+ * coupon and complimentary codes, descriptions and gallery out of the page.
+ */
+const ADMIN_EVENT_LIST_SELECT = {
+  id: true,
+  name: true,
+  date: true,
+  startTime: true,
+  endTime: true,
+  venue: true,
+  bannerImageUrl: true,
+  status: true,
+  isFree: true,
+  amount: true,
+  earlyBirdAmount: true,
+  isEarlyBird: true,
+  capacity: true,
+  isCompetition: true,
+  participationType: true,
+  groupExtraAmount: true,
+  gstEnabled: true,
+  platformFeeEnabled: true,
+  archivedParticipantCount: true,
+} satisfies Prisma.EventSelect
+
+export async function listEventsForAdmin(params: EventListParams) {
   const {
     page = 1,
     limit = DEFAULT_PAGE_SIZE,
@@ -56,7 +94,7 @@ export async function listEvents(params: EventListParams) {
   const [events, total] = await Promise.all([
     prisma.event.findMany({
       where,
-      include: { _count: { select: { participants: true } } },
+      select: ADMIN_EVENT_LIST_SELECT,
       orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
@@ -71,6 +109,33 @@ export async function listEvents(params: EventListParams) {
     totalPages: Math.ceil(total / limit),
   }
 }
+
+/**
+ * Fields the public events list needs: what the site's cards read, plus
+ * capacity and archivedParticipantCount, which only feed isFull and are
+ * dropped before the response (see getPublishedEvents).
+ */
+const PUBLIC_EVENT_LIST_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  bannerImageUrl: true,
+  venue: true,
+  venueLink: true,
+  date: true,
+  startTime: true,
+  endTime: true,
+  isFree: true,
+  amount: true,
+  earlyBirdAmount: true,
+  isEarlyBird: true,
+  isCompetition: true,
+  participationType: true,
+  status: true,
+  featured: true,
+  capacity: true,
+  archivedParticipantCount: true,
+} satisfies Prisma.EventSelect
 
 export async function listPublishedEvents(params: {
   page?: number
@@ -89,6 +154,9 @@ export async function listPublishedEvents(params: {
 
   if (!past) {
     if (featured === true) where.featured = true
+    // NOT rather than `featured: false`, so events stored before the field
+    // existed (no `featured` key in MongoDB) still count as not featured.
+    if (featured === false) where.NOT = { featured: true }
     if (upcoming === true) {
       // Day-granularity boundary (matches autoCompleteExpiredEvents below): an
       // event stays "upcoming" for its whole calendar day, not just until the
@@ -100,16 +168,24 @@ export async function listPublishedEvents(params: {
     }
   }
 
-  const [events, total] = await Promise.all([
-    prisma.event.findMany({
-      where,
-      include: { _count: { select: { participants: true } } },
-      orderBy: { date: past ? "desc" : "asc" },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.event.count({ where }),
-  ])
+  const skip = (page - 1) * limit
+  const events = await prisma.event.findMany({
+    where,
+    select: PUBLIC_EVENT_LIST_SELECT,
+    orderBy: { date: past ? "desc" : "asc" },
+    skip,
+    take: limit,
+  })
+
+  // A page with fewer events than the limit is the last one, so its total is
+  // known without counting. Only a full page (more may follow) or an empty
+  // page past the first (the total is unknown) needs the count. Running it
+  // after the list, not beside it, also avoids opening a second MongoDB
+  // connection on a cold instance.
+  const total =
+    events.length === limit || (page > 1 && events.length === 0)
+      ? await prisma.event.count({ where })
+      : skip + events.length
 
   return { events, total, page, totalPages: Math.ceil(total / limit) }
 }
@@ -119,6 +195,9 @@ export async function listPublishedEvents(params: {
  * end time (date + endTime, IST) has passed. endTime is a display string, so
  * the comparison cannot run inside MongoDB — narrow to events whose day has
  * begun (plus a day of slack for timezone skew) and decide in JS.
+ *
+ * Only events the public could see are completed. A draft (ANNOUNCED) keeps
+ * its status, because a COMPLETED event is listed on the site's past events.
  */
 export async function autoCompleteExpiredEvents() {
   const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -126,7 +205,7 @@ export async function autoCompleteExpiredEvents() {
   const candidates = await prisma.event.findMany({
     where: {
       date: { lte: cutoff },
-      status: { in: ["ANNOUNCED", ...PUBLIC_LIVE_STATUSES] },
+      status: { in: PUBLIC_LIVE_STATUSES },
     },
     select: { id: true, date: true, startTime: true, endTime: true },
   })

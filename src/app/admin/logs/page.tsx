@@ -1,6 +1,10 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
+import { after } from "next/server"
 import { auth } from "@/lib/auth"
+import { runThrottled } from "@/lib/ratelimit"
+import { parsePositiveInt } from "@/lib/query-params"
+import { LOG_ACTION_LABELS } from "@/constants"
 import { Pagination } from "@/components/shared/data-table"
 import { TableSkeleton } from "@/components/shared/skeleton-loaders"
 import { listActivityLogs, pruneOldActivityLogs } from "@/repositories/activity-log.repository"
@@ -18,12 +22,17 @@ interface SearchParams {
 }
 
 async function LogsContent({ params }: { params: SearchParams }) {
-  pruneOldActivityLogs().catch(() => {})
+  // Housekeeping after the page is sent, at most once an hour across instances.
+  after(() => runThrottled("prune-activity-logs", 60 * 60, pruneOldActivityLogs))
 
-  const page = parseInt(params.page ?? "1")
+  // Hand-edited URLs: a non-numeric page reads page 1, and an unknown action
+  // lists every action, instead of either reaching Prisma and failing.
+  const page = parsePositiveInt(params.page, 1, 1000)
   const search = params.search ?? ""
   const actionParam = params.action ?? ""
-  const action = (actionParam === "all" ? "" : actionParam) as LogAction | ""
+  const action = Object.keys(LOG_ACTION_LABELS).includes(actionParam)
+    ? (actionParam as LogAction)
+    : ""
 
   const { logs, total, totalPages } = await listActivityLogs({
     page,
@@ -85,7 +94,9 @@ export default async function LogsPage({
         <LogsFilter defaultSearch={params.search} defaultAction={params.action} />
       </Suspense>
 
-      <Suspense fallback={<TableSkeleton rows={10} cols={1} />}>
+      {/* Keyed by the query, so a new filter or page shows the skeleton
+          instead of leaving the old list on screen while it loads. */}
+      <Suspense key={JSON.stringify(params)} fallback={<TableSkeleton rows={10} cols={1} toolbar={false} />}>
         <LogsContent params={params} />
       </Suspense>
     </div>

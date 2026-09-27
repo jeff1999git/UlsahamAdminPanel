@@ -2,19 +2,18 @@
 
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import { logActivity } from "@/lib/activity-logger"
 import {
   createNewEvent,
   updateExistingEvent,
   deleteEventWithCleanup,
   toggleEventStatus,
-  getEvents,
   getEventById,
 } from "@/services/event.service"
 import { createEventSchema, updateEventSchema } from "@/validators/event.validator"
 import type { ActionResult } from "@/types"
 import type { EventStatus, Event } from "@prisma/client"
-import type { EventListParams } from "@/types/event.types"
 
 async function getSession() {
   const session = await auth()
@@ -115,11 +114,15 @@ export async function deleteEventAction(id: string): Promise<ActionResult<void>>
     })
 
     revalidatePath("/admin/events")
-    return { success: true, data: undefined }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to delete event"
     return { success: false, error: msg }
   }
+
+  // Straight to the events list in this same response: returning instead
+  // would first re-render the edit page, which is a 404 once the event is
+  // gone. redirect() throws, so it stays outside the try.
+  redirect("/admin/events")
 }
 
 export async function toggleEventStatusAction(
@@ -148,8 +151,4 @@ export async function toggleEventStatusAction(
     const msg = error instanceof Error ? error.message : "Failed to update status"
     return { success: false, error: msg }
   }
-}
-
-export async function getEventsAction(params: EventListParams) {
-  return getEvents(params)
 }

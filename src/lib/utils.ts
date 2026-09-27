@@ -42,29 +42,26 @@ export function formatDateTime(date: Date | string): string {
   return `${parts.day} ${parts.month} ${parts.year}, ${parts.hour}:${parts.minute} ${parts.dayPeriod}`
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount)
+const amountFormatter = new Intl.NumberFormat("en-IN", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+})
+
+/** Rupee amount with Indian digit grouping and no ₹ sign; render the sign with <Rupee />. */
+export function formatAmount(amount: number): string {
+  return amountFormatter.format(amount)
 }
 
-export function sanitizeString(input: string): string {
-  return input.replace(/<[^>]*>/g, "").trim()
-}
-
-export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
-  const sanitized: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === "string") {
-      sanitized[key] = sanitizeString(value)
-    } else {
-      sanitized[key] = value
-    }
-  }
-  return sanitized as T
+/**
+ * True when a lazily loaded chunk (import()) could not be fetched: the device is
+ * offline, or the tab was opened before a deploy and its chunk no longer exists.
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return (
+    error.name === "ChunkLoadError" ||
+    /loading (css )?chunk|dynamically imported module|importing a module script failed/i.test(error.message)
+  )
 }
 
 export function generatePaginationRange(

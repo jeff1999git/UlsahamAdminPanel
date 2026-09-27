@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { generatePaginationRange } from "@/lib/utils"
 
@@ -9,6 +9,41 @@ interface PaginationProps {
   totalPages: number
   baseUrl: string
   searchParams?: Record<string, string>
+}
+
+/**
+ * A first/previous/next/last control. At the bounds it is a plain span:
+ * `disabled` does nothing on a link, which would still lead to "#".
+ */
+function StepLink({
+  href,
+  disabled,
+  label,
+  children,
+}: {
+  href: string
+  disabled: boolean
+  label: string
+  children: React.ReactNode
+}) {
+  if (disabled) {
+    return (
+      <span
+        aria-disabled="true"
+        aria-label={label}
+        className={cn(buttonVariants({ variant: "outline", size: "icon" }), "h-8 w-8 pointer-events-none opacity-50")}
+      >
+        {children}
+      </span>
+    )
+  }
+  return (
+    <Button variant="outline" size="icon" asChild className="h-8 w-8">
+      <Link href={href} aria-label={label}>
+        {children}
+      </Link>
+    </Button>
+  )
 }
 
 export function Pagination({ page, totalPages, baseUrl, searchParams = {} }: PaginationProps) {
@@ -27,16 +62,12 @@ export function Pagination({ page, totalPages, baseUrl, searchParams = {} }: Pag
       role="navigation"
       aria-label="Pagination"
     >
-      <Button variant="outline" size="icon" asChild disabled={page <= 1} className="h-8 w-8">
-        <Link href={page > 1 ? getUrl(1) : "#"} aria-label="First page">
-          <ChevronsLeft className="h-4 w-4" />
-        </Link>
-      </Button>
-      <Button variant="outline" size="icon" asChild disabled={page <= 1} className="h-8 w-8">
-        <Link href={page > 1 ? getUrl(page - 1) : "#"} aria-label="Previous page">
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-      </Button>
+      <StepLink href={getUrl(1)} disabled={page <= 1} label="First page">
+        <ChevronsLeft className="h-4 w-4" />
+      </StepLink>
+      <StepLink href={getUrl(page - 1)} disabled={page <= 1} label="Previous page">
+        <ChevronLeft className="h-4 w-4" />
+      </StepLink>
 
       {range.map((item, i) =>
         item === "..." ? (
@@ -58,16 +89,12 @@ export function Pagination({ page, totalPages, baseUrl, searchParams = {} }: Pag
         )
       )}
 
-      <Button variant="outline" size="icon" asChild disabled={page >= totalPages} className="h-8 w-8">
-        <Link href={page < totalPages ? getUrl(page + 1) : "#"} aria-label="Next page">
-          <ChevronRight className="h-4 w-4" />
-        </Link>
-      </Button>
-      <Button variant="outline" size="icon" asChild disabled={page >= totalPages} className="h-8 w-8">
-        <Link href={page < totalPages ? getUrl(totalPages) : "#"} aria-label="Last page">
-          <ChevronsRight className="h-4 w-4" />
-        </Link>
-      </Button>
+      <StepLink href={getUrl(page + 1)} disabled={page >= totalPages} label="Next page">
+        <ChevronRight className="h-4 w-4" />
+      </StepLink>
+      <StepLink href={getUrl(totalPages)} disabled={page >= totalPages} label="Last page">
+        <ChevronsRight className="h-4 w-4" />
+      </StepLink>
     </div>
   )
 }

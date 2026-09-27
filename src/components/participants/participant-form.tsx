@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/form"
 import { participantSchema, type ParticipantFormValues } from "@/validators/participant.validator"
 import { addParticipantAction, updateParticipantAction } from "@/actions/participant.actions"
+import { ACTION_FAILED_MESSAGE } from "@/constants"
 
 interface ParticipantFormProps {
   eventId: string
@@ -45,18 +46,22 @@ export function ParticipantForm({ eventId, participant, onSuccess }: Participant
   const isSubmitting = form.formState.isSubmitting
 
   async function onSubmit(values: ParticipantFormValues) {
-    const result = isEditing
-      ? await updateParticipantAction(participant.id, eventId, values)
-      : await addParticipantAction(eventId, values)
+    try {
+      const result = isEditing
+        ? await updateParticipantAction(participant.id, eventId, values)
+        : await addParticipantAction(eventId, values)
 
-    if (!result.success) {
-      toast.error(result.error)
-      return
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+
+      toast.success(isEditing ? "Participant updated" : "Participant added successfully")
+      form.reset()
+      onSuccess?.()
+    } catch {
+      toast.error(ACTION_FAILED_MESSAGE)
     }
-
-    toast.success(isEditing ? "Participant updated" : "Participant added successfully")
-    form.reset()
-    onSuccess?.()
   }
 
   return (

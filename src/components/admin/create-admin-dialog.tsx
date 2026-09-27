@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { createAdminSchema, type CreateAdminFormValues } from "@/validators/admin.validator"
 import { createAdminAction } from "@/actions/admin.actions"
+import { ACTION_FAILED_MESSAGE } from "@/constants"
 
 interface CreateAdminDialogProps {
   role: "ADMIN" | "USER"
@@ -48,14 +49,18 @@ export function CreateAdminDialog({ role }: CreateAdminDialogProps) {
     fd.append("confirmPassword", values.confirmPassword)
     fd.append("role", role)
 
-    const result = await createAdminAction(fd)
+    try {
+      const result = await createAdminAction(fd)
 
-    if (result.success) {
-      toast.success(`${isAdmin ? "Admin" : "User"} account "${result.data.username}" created`)
-      form.reset()
-      setOpen(false)
-    } else {
-      toast.error(result.error)
+      if (result.success) {
+        toast.success(`${isAdmin ? "Admin" : "User"} account "${result.data.username}" created`)
+        form.reset()
+        setOpen(false)
+      } else {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error(ACTION_FAILED_MESSAGE)
     }
   }
 
