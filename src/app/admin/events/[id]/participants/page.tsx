@@ -59,6 +59,7 @@ export default async function ParticipantsPage({ params }: Props) {
       <ParticipantTable
         participants={participants}
         eventId={id}
+        eventIsFree={event.isFree}
         totalCount={participants.reduce((sum, p) => sum + p.numberOfParticipants, 0)}
         eventName={event.name}
         eventDate={formatDate(event.date)}

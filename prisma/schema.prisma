@@ -77,6 +77,13 @@ enum ParticipationType {
   BOTH
 }
 
+// How a booking was settled. Set once when the booking is created, never by hand.
+enum EntryType {
+  PAID          // paid through Razorpay, on the site or at the staff counter
+  COMPLIMENTARY // a complimentary code on the site, or added by staff
+  FREE          // a free event booked on the site
+}
+
 type CouponCode {
   code     String
   discount Float
@@ -106,6 +113,9 @@ model Participant {
   competitionNumber    Int?
   isGroupRegistration  Boolean   @default(false)
   amountPaid           Boolean   @default(false)
+  // Optional because bookings made before it existed lack it; entryStatusOf()
+  // in src/lib/entry-type.ts infers one for those.
+  entryType            EntryType?
   // Razorpay identifiers for paid bookings. paymentOrderId is the idempotency
   // key that lets payment/verify and the webhook safely replay the same order.
   paymentOrderId       String?

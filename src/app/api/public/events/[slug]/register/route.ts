@@ -124,6 +124,8 @@ export async function POST(
       ...parsed.data,
       email: parsed.data.email || null,
       amountPaid: true,
+      // A paid event only reaches this route with a valid complimentary code.
+      entryType: complimentaryCode ? "COMPLIMENTARY" : "FREE",
     })
 
     if (complimentaryCode) {

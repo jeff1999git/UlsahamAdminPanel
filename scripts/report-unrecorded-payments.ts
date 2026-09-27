@@ -121,7 +121,10 @@ async function main() {
   console.log(`Captured ticket payments in last ${days} days: ${recorded + unrecorded.length} (recorded: ${recorded}, UNRECORDED: ${unrecorded.length})`)
   if (unrecorded.length) {
     console.table(unrecorded)
-    console.log("Issue these bookings via Admin > Event > Participants > Add (mark paid), quoting the Razorpay payment id.")
+    console.log(
+      "Issue these bookings via Admin > Event > Participants > Add, quoting the Razorpay payment id. " +
+        "Anything added there is recorded as Complimentary, so these will not count towards dashboard revenue."
+    )
   }
   await prisma.$disconnect()
 }

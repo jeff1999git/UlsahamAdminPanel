@@ -1,4 +1,4 @@
-import type { Participant, Event } from "@prisma/client"
+import type { Participant, Event, EntryType } from "@prisma/client"
 
 export type ParticipantWithEvent = Participant & {
   event: Pick<Event, "id" | "name" | "slug" | "date" | "venue">
@@ -12,6 +12,8 @@ export type CreateParticipantInput = {
   age: number
   numberOfParticipants: number
   amountPaid?: boolean
+  /** How the booking is settled; see the EntryType enum. */
+  entryType?: EntryType
   /**
    * Razorpay order id for paid bookings. Makes registration idempotent: a
    * second call with the same order id returns the booking created by the

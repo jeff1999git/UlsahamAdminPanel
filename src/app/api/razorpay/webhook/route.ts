@@ -7,6 +7,7 @@ import {
 } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
 import { logActivity } from "@/lib/activity-logger"
+import { fetchOrderBooking } from "@/lib/razorpay"
 
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET
@@ -41,38 +42,40 @@ export async function POST(request: NextRequest) {
   try {
     const payment = (body.payload as Record<string, unknown>)?.payment as Record<string, unknown>
     const entity = payment?.entity as Record<string, unknown> | undefined
-    const notes = entity?.notes as Record<string, string> | undefined
     const paymentId = entity?.id as string | undefined
     const orderId = entity?.order_id as string | undefined
 
-    const eventId = notes?.eventId
-    const phone = notes?.phone
-    const name = notes?.name
-    const email = notes?.email || null
-    const age = notes?.age ? parseInt(notes.age, 10) : undefined
-    const numberOfParticipants = notes?.numberOfParticipants
-      ? parseInt(notes.numberOfParticipants, 10)
-      : 1
-    const repayTicketCode = notes?.ticketCode
-
-    if (!eventId || !phone) {
-      console.error("[Razorpay Webhook] Missing eventId or phone in notes")
-      // Return 200 so Razorpay doesn't keep retrying an unrecoverable case
+    if (!orderId) {
+      console.error("[Razorpay Webhook] Missing order_id on payment entity")
       return NextResponse.json({ status: "skipped" })
     }
 
+    // The payment's own notes can be set by the payer at Checkout, so the
+    // booking is read from the order, whose notes the server wrote when it
+    // created it — the same source payment/verify uses, so both always book the
+    // same event and seats. A failed fetch lands in the 500 below and Razorpay
+    // retries the delivery.
+    const booking = await fetchOrderBooking(orderId)
+    if (!booking) {
+      console.error("[Razorpay Webhook] Order has no usable booking notes", { orderId })
+      // Return 200 so Razorpay doesn't keep retrying an unrecoverable case
+      return NextResponse.json({ status: "skipped" })
+    }
+    const { eventId } = booking
+
     // 1) Re-payment of an existing unpaid ticket (order carried its ticketCode).
-    if (repayTicketCode) {
-      const ticket = await findParticipantByTicketCodeOnly(repayTicketCode)
+    if (booking.kind === "repay") {
+      const ticket = await findParticipantByTicketCodeOnly(booking.ticketCode)
       if (!ticket || ticket.eventId !== eventId) {
-        console.error("[Razorpay Webhook] Re-payment ticket not found", { eventId, repayTicketCode })
+        console.error("[Razorpay Webhook] Re-payment ticket not found", { eventId, ticketCode: booking.ticketCode })
         return NextResponse.json({ status: "skipped" })
       }
       if (!ticket.amountPaid) {
         await updateParticipant(ticket.id, {
           amountPaid: true,
+          entryType: "PAID",
           paymentId: paymentId ?? null,
-          paymentOrderId: ticket.paymentOrderId ?? orderId ?? null,
+          paymentOrderId: ticket.paymentOrderId ?? orderId,
         })
         await logActivity({
           adminUsername: "razorpay-webhook",
@@ -81,22 +84,19 @@ export async function POST(request: NextRequest) {
           entity: "Participant",
           entityId: ticket.id,
           description: `Payment confirmed via webhook: ${ticket.name} (${ticket.ticketCode}) — Payment: ${paymentId}`,
-          metadata: { eventId, phone, paymentId, orderId },
+          metadata: { eventId, phone: ticket.phone, paymentId, orderId },
         })
       }
       return NextResponse.json({ status: "ok" })
     }
 
-    if (!orderId) {
-      console.error("[Razorpay Webhook] Missing order_id on payment entity")
-      return NextResponse.json({ status: "skipped" })
-    }
+    const { phone } = booking
 
     // 2) Booking for this order already exists (payment/verify ran first).
     const existing = await findParticipantByEventAndOrderId(eventId, orderId)
     if (existing) {
       if (!existing.amountPaid) {
-        await updateParticipant(existing.id, { amountPaid: true, paymentId: paymentId ?? null })
+        await updateParticipant(existing.id, { amountPaid: true, entryType: "PAID", paymentId: paymentId ?? null })
         await logActivity({
           adminUsername: "razorpay-webhook",
           adminRole: "SYSTEM",
@@ -113,26 +113,22 @@ export async function POST(request: NextRequest) {
     // 3) Browser never reached payment/verify — create the booking now.
     //    registerParticipant is idempotent on paymentOrderId, so a concurrent
     //    verify call cannot produce a second ticket for this payment.
-    if (!name || age === undefined || isNaN(age)) {
-      console.error("[Razorpay Webhook] Insufficient notes data to create participant", notes)
-      return NextResponse.json({ status: "skipped" })
-    }
-
     const { participant, isNew } = await registerParticipant({
       eventId,
-      name,
+      name: booking.name,
       phone,
-      email,
-      age,
-      numberOfParticipants,
+      email: booking.email,
+      age: booking.age,
+      numberOfParticipants: booking.numberOfParticipants,
       amountPaid: true,
+      entryType: "PAID",
       paymentOrderId: orderId,
       paymentId: paymentId ?? null,
     })
 
     if (!isNew) {
       if (!participant.amountPaid) {
-        await updateParticipant(participant.id, { amountPaid: true, paymentId: paymentId ?? null })
+        await updateParticipant(participant.id, { amountPaid: true, entryType: "PAID", paymentId: paymentId ?? null })
       }
       return NextResponse.json({ status: "ok" })
     }

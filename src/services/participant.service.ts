@@ -115,6 +115,7 @@ export async function registerParticipant(
         paymentOrderId: orderId,
         paymentId: input.paymentId || null,
         ...(input.amountPaid !== undefined && { amountPaid: input.amountPaid }),
+        ...(input.entryType && { entryType: input.entryType }),
       })
       return { participant, isNew: true }
     } catch (err) {
@@ -180,10 +181,6 @@ export async function toggleAttendance(id: string, attended: boolean) {
     attendedAt: null,
     enteredCount: 0,
   })
-}
-
-export async function toggleAmountPaid(id: string, amountPaid: boolean) {
-  return updateParticipant(id, { amountPaid })
 }
 
 export async function scanAndMarkAttendance(ticketCode: string, eventId: string) {
