@@ -33,6 +33,7 @@ import { MultiImageUpload } from "@/components/shared/multi-image-upload"
 import { createEventSchema, MAX_GALLERY_IMAGES, type CreateEventFormValues } from "@/validators/event.validator"
 import { createEventAction, updateEventAction } from "@/actions/event.actions"
 import { generateSlug } from "@/lib/slug"
+import { ACTION_FAILED_MESSAGE, WEBSITE_UPDATE_NOTE_EVENTS } from "@/constants"
 import type { Event } from "@prisma/client"
 
 interface EventFormProps {
@@ -165,18 +166,26 @@ export function EventForm({ event }: EventFormProps) {
   }
 
   async function onSubmit(values: CreateEventFormValues) {
-    const result = isEditing
-      ? await updateEventAction({ ...values, id: event.id })
-      : await createEventAction(values)
+    let result: Awaited<ReturnType<typeof createEventAction>>
+    try {
+      result = isEditing
+        ? await updateEventAction({ ...values, id: event.id })
+        : await createEventAction(values)
+    } catch {
+      toast.error(ACTION_FAILED_MESSAGE)
+      return
+    }
 
     if (!result.success) {
       toast.error(result.error)
       return
     }
 
-    toast.success(isEditing ? "Event updated successfully" : "Event created successfully")
+    toast.success(isEditing ? "Event updated successfully" : "Event created successfully", {
+      description: WEBSITE_UPDATE_NOTE_EVENTS,
+    })
+    // The events list is dynamic, so this navigation reads it fresh.
     router.push("/admin/events")
-    router.refresh()
   }
 
   return (

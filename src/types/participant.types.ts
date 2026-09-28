@@ -1,7 +1,31 @@
 import type { Participant, Event, EntryType } from "@prisma/client"
+import type { EntryStatus } from "@/lib/entry-type"
 
 export type ParticipantWithEvent = Participant & {
   event: Pick<Event, "id" | "name" | "slug" | "date" | "venue">
+}
+
+/**
+ * A booking as the participants table receives it: the fields it shows, with
+ * the entry type worked out on the server so Razorpay payment references stay
+ * there. Every field is a plain value (dates as ISO strings), so rows can be
+ * compared field by field.
+ */
+export type ParticipantRow = {
+  id: string
+  name: string
+  phone: string
+  email: string | null
+  age: number
+  numberOfParticipants: number
+  ticketCode: string
+  competitionNumber: number | null
+  isGroupRegistration: boolean
+  amountPaid: boolean
+  attended: boolean
+  attendedAt: string | null
+  registeredAt: string
+  entryStatus: EntryStatus
 }
 
 export type CreateParticipantInput = {
@@ -28,23 +52,6 @@ export type UpdateParticipantInput = {
   email?: string | null
   age?: number
   numberOfParticipants?: number
-}
-
-export type ParticipantListParams = {
-  eventId: string
-  page?: number
-  limit?: number
-  search?: string
-  attended?: boolean | ""
-  sortBy?: "registeredAt" | "name" | "attended"
-  sortOrder?: "asc" | "desc"
-}
-
-export type ParticipantListResult = {
-  participants: Participant[]
-  total: number
-  page: number
-  totalPages: number
 }
 
 export type PublicParticipantCheck = {

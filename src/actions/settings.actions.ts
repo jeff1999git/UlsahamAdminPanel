@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { logActivity } from "@/lib/activity-logger"
-import { getSettings, upsertSettings, addBrandPartner, removeBrandPartner } from "@/repositories/settings.repository"
+import { upsertSettings, addBrandPartner, removeBrandPartner } from "@/repositories/settings.repository"
 import { deleteImage } from "@/lib/cloudinary"
 import { settingsSchema } from "@/validators/settings.validator"
 import type { ActionResult } from "@/types"
@@ -16,10 +16,6 @@ async function getSession() {
     username: (session.user as { username?: string }).username ?? "unknown",
     role: (session.user as { role?: string }).role ?? "ADMIN",
   }
-}
-
-export async function getSettingsAction(): Promise<Settings> {
-  return getSettings()
 }
 
 export async function updateSettingsAction(

@@ -5,7 +5,8 @@ import Image from "next/image"
 import { Upload, X, Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_MB } from "@/constants"
+import { resizeImageForUpload } from "@/lib/image-resize"
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_BYTES, MAX_IMAGE_SIZE_MB } from "@/constants"
 
 interface MultiImageUploadProps {
   images: { url: string; id: string }[]
@@ -17,12 +18,19 @@ interface MultiImageUploadProps {
 }
 
 async function uploadOne(file: File): Promise<{ url: string; publicId: string }> {
+  // Photos are shrunk first, so the size limit applies to what is sent.
+  const upload = await resizeImageForUpload(file)
+  if (upload.size > MAX_IMAGE_SIZE_BYTES) {
+    throw new Error(`${file.name}: must be smaller than ${MAX_IMAGE_SIZE_MB}MB`)
+  }
   const formData = new FormData()
-  formData.append("file", file)
+  formData.append("file", upload)
   const res = await fetch("/api/admin/upload", { method: "POST", body: formData })
+  // Vercel answers an oversized body itself, without JSON.
+  if (res.status === 413) throw new Error(`${file.name}: image too large`)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Upload failed" }))
-    throw new Error(err.error ?? "Upload failed")
+    throw new Error(`${file.name}: ${err.error ?? "Upload failed"}`)
   }
   return res.json()
 }
@@ -44,15 +52,10 @@ export function MultiImageUpload({
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
 
-    const maxBytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
     const valid: File[] = []
     for (const file of files) {
       if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
         toast.error(`${file.name}: only JPG, PNG, and WEBP images are allowed`)
-        continue
-      }
-      if (file.size > maxBytes) {
-        toast.error(`${file.name}: must be smaller than ${MAX_IMAGE_SIZE_MB}MB`)
         continue
       }
       valid.push(file)
@@ -69,10 +72,23 @@ export function MultiImageUpload({
 
     setUploading(true)
     try {
-      const results = await Promise.all(toUpload.map(uploadOne))
-      onAdd(results.map((r) => ({ url: r.url, id: r.publicId })))
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Upload failed")
+      // Keep every image that did upload, even when others in the batch fail.
+      const results = await Promise.allSettled(toUpload.map(uploadOne))
+      const uploaded = results.flatMap((r) =>
+        r.status === "fulfilled" ? [{ url: r.value.url, id: r.value.publicId }] : []
+      )
+      if (uploaded.length) onAdd(uploaded)
+
+      const failures = results.flatMap((r) =>
+        r.status === "rejected" ? [r.reason instanceof Error ? r.reason.message : "Upload failed"] : []
+      )
+      if (failures.length === 1) {
+        toast.error(failures[0])
+      } else if (failures.length > 1) {
+        toast.error(`${failures.length} of ${results.length} images failed to upload`, {
+          description: failures.join(" · "),
+        })
+      }
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ""
@@ -99,7 +115,13 @@ export function MultiImageUpload({
               key={img.id}
               className="relative aspect-square rounded-lg overflow-hidden border border-black"
             >
-              <Image src={img.url} alt={`Gallery image ${index + 1}`} fill className="object-cover" />
+              <Image
+                src={img.url}
+                alt={`Gallery image ${index + 1}`}
+                fill
+                sizes="(min-width: 640px) 25vw, 33vw"
+                className="object-cover"
+              />
               {!disabled && (
                 <button
                   type="button"

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import Image from "next/image"
 import {
@@ -24,16 +25,23 @@ import {
 } from "@/components/ui/dialog"
 import { EventStatusBadge } from "@/components/events/event-status-badge"
 import { TableEmpty } from "@/components/shared/data-table"
-import { EnrollDialog } from "@/components/participants/enroll-dialog"
-import { formatDate, formatCurrency } from "@/lib/utils"
-import type { EventWithParticipantCount } from "@/types/event.types"
+import { Amount } from "@/components/shared/rupee"
+import { formatDate } from "@/lib/utils"
+import type { AdminEventListItem } from "@/types/event.types"
 
-function participantCount(event: EventWithParticipantCount): number {
-  return event.registeredCount
+// Only counter staff (USER) enrol guests, so the form and payment code load
+// on demand instead of with the events list for every role.
+const EnrollDialog = dynamic(
+  () => import("@/components/participants/enroll-dialog").then((m) => m.EnrollDialog),
+  { ssr: false }
+)
+
+function participantCount(event: AdminEventListItem): number {
+  return event.registeredCount ?? 0
 }
 
 interface EventTableProps {
-  events: EventWithParticipantCount[]
+  events: AdminEventListItem[]
   isUser?: boolean
   isSuperAdmin?: boolean
 }
@@ -41,12 +49,14 @@ interface EventTableProps {
 const ENROLL_STORAGE_KEY = "ulsaham_user_enrollments"
 
 export function EventTable({ events, isUser = false, isSuperAdmin = false }: EventTableProps) {
-  const [selected, setSelected] = useState<EventWithParticipantCount | null>(null)
-  const [enrollEvent, setEnrollEvent] = useState<EventWithParticipantCount | null>(null)
+  const [selected, setSelected] = useState<AdminEventListItem | null>(null)
+  const [enrollEvent, setEnrollEvent] = useState<AdminEventListItem | null>(null)
   const [enrolledEventIds, setEnrolledEventIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!isUser) return
+    // Warm the enrol dialog chunk so the first Enroll tap opens without a wait.
+    import("@/components/participants/enroll-dialog").catch(() => {})
     try {
       const stored = localStorage.getItem(ENROLL_STORAGE_KEY)
       if (stored) setEnrolledEventIds(new Set(JSON.parse(stored) as string[]))
@@ -123,6 +133,7 @@ export function EventTable({ events, isUser = false, isSuperAdmin = false }: Eve
                   src={selected.bannerImageUrl}
                   alt={selected.name}
                   fill
+                  sizes="(min-width: 640px) 384px, 100vw"
                   className="object-cover"
                 />
               </div>
@@ -162,17 +173,17 @@ export function EventTable({ events, isUser = false, isSuperAdmin = false }: Eve
                     (selected as { earlyBirdAmount?: number | null }).earlyBirdAmount != null ? (
                     <span className="flex items-center gap-1.5">
                       <span className="text-sm line-through text-black/40">
-                        {formatCurrency(selected.amount ?? 0)}
+                        <Amount value={selected.amount ?? 0} />
                       </span>
                       <span className="text-sm font-medium text-[#014421]">
-                        {formatCurrency((selected as { earlyBirdAmount: number }).earlyBirdAmount)}
+                        <Amount value={(selected as { earlyBirdAmount: number }).earlyBirdAmount} />
                       </span>
                       <span className="text-xs text-[#014421] bg-[#014421]/10 px-1.5 py-0.5 rounded-full">
                         Early bird
                       </span>
                     </span>
                   ) : (
-                    <span className="text-sm text-black">{formatCurrency(selected.amount ?? 0)}</span>
+                    <span className="text-sm text-black"><Amount value={selected.amount ?? 0} /></span>
                   )}
                 </div>
                 {!isUser && (
@@ -243,7 +254,7 @@ export function EventTable({ events, isUser = false, isSuperAdmin = false }: Eve
       </Dialog>
 
       {/* Enroll dialog for USER role */}
-      {isUser && (
+      {isUser && enrollEvent && (
         <EnrollDialog
           event={enrollEvent}
           open={!!enrollEvent}

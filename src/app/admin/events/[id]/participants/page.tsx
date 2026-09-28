@@ -3,11 +3,13 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { findEventById } from "@/repositories/event.repository"
-import { getAllParticipantsForEvent } from "@/repositories/participant.repository"
+import { getParticipantRowsForEvent } from "@/repositories/participant.repository"
 import { ParticipantTable } from "@/components/participants/participant-table"
 import { AddParticipantDialog } from "@/components/participants/add-participant-dialog"
 import { ImportParticipantsDialog } from "@/components/participants/import-participants-dialog"
+import { entryStatusOf } from "@/lib/entry-type"
 import { formatDate } from "@/lib/utils"
+import type { ParticipantRow } from "@/types/participant.types"
 import type { Metadata } from "next"
 
 interface Props {
@@ -27,18 +29,32 @@ export default async function ParticipantsPage({ params }: Props) {
 
   const { id } = await params
 
-  const [event, participants] = await Promise.all([
+  const [event, bookings] = await Promise.all([
     findEventById(id),
-    getAllParticipantsForEvent(id),
+    getParticipantRowsForEvent(id),
   ])
 
   if (!event) {
     notFound()
   }
 
+  // The entry type is worked out here, so the Razorpay references it reads
+  // never reach the browser.
+  const participants: ParticipantRow[] = bookings.map(
+    ({ entryType, paymentId, paymentOrderId, attendedAt, registeredAt, ...booking }) => ({
+      ...booking,
+      attendedAt: attendedAt ? attendedAt.toISOString() : null,
+      registeredAt: registeredAt.toISOString(),
+      entryStatus: entryStatusOf(
+        { entryType, amountPaid: booking.amountPaid, paymentId, paymentOrderId },
+        event.isFree
+      ),
+    })
+  )
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link
             href="/admin/events"

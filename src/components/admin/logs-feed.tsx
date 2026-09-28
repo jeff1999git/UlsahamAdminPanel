@@ -10,25 +10,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ChevronRight, User, Clock, Monitor, Tag, FileText } from "lucide-react"
-import { LOG_ACTION_LABELS } from "@/constants"
-
-const actionVariantMap: Record<string, "default" | "secondary" | "destructive" | "success" | "warning" | "info" | "muted"> = {
-  LOGIN: "success",
-  LOGOUT: "muted",
-  EVENT_CREATED: "info",
-  EVENT_UPDATED: "info",
-  EVENT_DELETED: "destructive",
-  EVENT_STATUS_CHANGED: "warning",
-  PARTICIPANT_ADDED: "success",
-  PARTICIPANT_UPDATED: "info",
-  PARTICIPANT_DELETED: "destructive",
-  ATTENDANCE_MARKED: "success",
-  ATTENDANCE_UNMARKED: "warning",
-  SETTINGS_UPDATED: "info",
-  ADMIN_CREATED: "info",
-  ADMIN_UPDATED: "info",
-  ADMIN_DELETED: "destructive",
-}
+import { LOG_ACTION_LABELS, LOG_ACTION_VARIANTS, ROLE_LABELS } from "@/constants"
+// IST-pinned, so the server (UTC) and the browser render the same text.
+import { formatDateTime } from "@/lib/utils"
 
 export type SerializedLog = {
   id: string
@@ -40,17 +24,6 @@ export type SerializedLog = {
   description: string
   ipAddress: string
   createdAt: string
-}
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  })
 }
 
 export function LogsFeed({ logs }: { logs: SerializedLog[] }) {
@@ -78,7 +51,7 @@ export function LogsFeed({ logs }: { logs: SerializedLog[] }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge
-                        variant={actionVariantMap[log.action] ?? "muted"}
+                        variant={LOG_ACTION_VARIANTS[log.action] ?? "muted"}
                         className="text-xs shrink-0"
                       >
                         {LOG_ACTION_LABELS[log.action] ?? log.action}
@@ -108,7 +81,7 @@ export function LogsFeed({ logs }: { logs: SerializedLog[] }) {
             <div className="space-y-4 pt-1">
               {/* Action badge */}
               <Badge
-                variant={actionVariantMap[selected.action] ?? "muted"}
+                variant={LOG_ACTION_VARIANTS[selected.action] ?? "muted"}
                 className="text-sm px-3 py-1"
               >
                 {LOG_ACTION_LABELS[selected.action] ?? selected.action}
@@ -130,7 +103,7 @@ export function LogsFeed({ logs }: { logs: SerializedLog[] }) {
                   <p className="text-xs text-black/50 mb-0.5">Admin</p>
                   <p className="text-sm font-medium text-black">{selected.adminUsername}</p>
                   <p className="text-xs text-black/60">
-                    {selected.adminRole === "SUPER_ADMIN" ? "Super Admin" : "Admin"}
+                    {ROLE_LABELS[selected.adminRole] ?? "Admin"}
                   </p>
                 </div>
               </div>

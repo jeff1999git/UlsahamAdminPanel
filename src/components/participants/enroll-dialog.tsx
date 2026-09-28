@@ -29,16 +29,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Rupee } from "@/components/shared/rupee"
 import { participantSchema, type ParticipantFormValues } from "@/validators/participant.validator"
 import { addParticipantAction } from "@/actions/participant.actions"
 import { createPaymentOrderAction, verifyAndEnrollAction } from "@/actions/payment.actions"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
-import type { Event } from "@prisma/client"
+import type { AdminEventListItem } from "@/types/event.types"
 
 interface EnrollDialogProps {
-  event: Event | null
+  event: AdminEventListItem | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onEnrolled?: () => void
@@ -216,30 +216,40 @@ export function EnrollDialog({
                 <div className="flex items-center justify-between text-black/70">
                   <span className="flex items-center gap-1.5">
                     <IndianRupee className="h-3.5 w-3.5" />
-                    {isCompetition && numberOfParticipants > 1
-                      ? `₹${effectiveAmount.toLocaleString("en-IN")} + ${numberOfParticipants - 1} × ₹${(extraMemberPrice ?? 0).toLocaleString("en-IN")} (group entry)`
-                      : isCompetition
-                      ? `₹${effectiveAmount.toLocaleString("en-IN")} (individual entry)`
-                      : `₹${effectiveAmount.toLocaleString("en-IN")} × ${numberOfParticipants} person${numberOfParticipants !== 1 ? "s" : ""}`}
+                    <span>
+                      {isCompetition && numberOfParticipants > 1 ? (
+                        <>
+                          <Rupee />{effectiveAmount.toLocaleString("en-IN")} + {numberOfParticipants - 1} × <Rupee />{(extraMemberPrice ?? 0).toLocaleString("en-IN")} (group entry)
+                        </>
+                      ) : isCompetition ? (
+                        <>
+                          <Rupee />{effectiveAmount.toLocaleString("en-IN")} (individual entry)
+                        </>
+                      ) : (
+                        <>
+                          <Rupee />{effectiveAmount.toLocaleString("en-IN")} × {numberOfParticipants} person{numberOfParticipants !== 1 ? "s" : ""}
+                        </>
+                      )}
+                    </span>
                   </span>
-                  <span>₹{fees.base.toLocaleString("en-IN")}</span>
+                  <span><Rupee />{fees.base.toLocaleString("en-IN")}</span>
                 </div>
                 {fees.gst > 0 && (
                   <div className="flex items-center justify-between text-black/50 text-xs">
                     <span>GST (18%)</span>
-                    <span>₹{fees.gst.toLocaleString("en-IN")}</span>
+                    <span><Rupee />{fees.gst.toLocaleString("en-IN")}</span>
                   </div>
                 )}
                 {fees.platformFee > 0 && (
                   <div className="flex items-center justify-between text-black/50 text-xs">
                     <span>Platform fee (2%)</span>
-                    <span>₹{fees.platformFee.toLocaleString("en-IN")}</span>
+                    <span><Rupee />{fees.platformFee.toLocaleString("en-IN")}</span>
                   </div>
                 )}
                 <Separator className="bg-[#014421]/20" />
                 <div className="flex items-center justify-between font-semibold text-[#014421]">
                   <span>Total</span>
-                  <span>₹{fees.total.toLocaleString("en-IN")}</span>
+                  <span><Rupee />{fees.total.toLocaleString("en-IN")}</span>
                 </div>
               </div>
             )}
@@ -364,7 +374,7 @@ export function EnrollDialog({
                       : "Processing..."
                     : isFree
                     ? "Enroll for Free"
-                    : `Pay ₹${fees?.total.toLocaleString("en-IN") ?? ""} & Enroll`}
+                    : <span>Pay <Rupee />{fees?.total.toLocaleString("en-IN") ?? ""} & Enroll</span>}
                 </Button>
               </form>
             </Form>

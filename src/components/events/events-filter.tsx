@@ -3,13 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { NativeSelect } from "@/components/ui/native-select"
 
 interface EventsFilterProps {
   defaultSearch?: string
@@ -50,22 +44,19 @@ export function EventsFilter({ defaultSearch, defaultStatus }: EventsFilterProps
         />
       </form>
 
-      <Select
+      <NativeSelect
+        wrapperClassName="w-[160px]"
+        aria-label="Filter by status"
         defaultValue={defaultStatus ?? "all"}
-        onValueChange={(value) => navigate("status", value)}
+        onChange={(e) => navigate("status", e.target.value)}
       >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="All Statuses" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
-          <SelectItem value="ANNOUNCED">Announced</SelectItem>
-          <SelectItem value="PUBLISHED">Published</SelectItem>
-          <SelectItem value="BOOKING_CLOSED">Booking Closed</SelectItem>
-          <SelectItem value="CANCELLED">Cancelled</SelectItem>
-          <SelectItem value="COMPLETED">Completed</SelectItem>
-        </SelectContent>
-      </Select>
+        <option value="all">All Statuses</option>
+        <option value="ANNOUNCED">Announced</option>
+        <option value="PUBLISHED">Published</option>
+        <option value="BOOKING_CLOSED">Booking Closed</option>
+        <option value="CANCELLED">Cancelled</option>
+        <option value="COMPLETED">Completed</option>
+      </NativeSelect>
     </div>
   )
 }

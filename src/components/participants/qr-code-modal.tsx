@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { QrCode, Download, Hash } from "lucide-react"
 import { toast } from "sonner"
@@ -13,7 +13,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { downloadParticipationCardPdf } from "@/lib/participation-card-pdf"
+import { downloadParticipationCardPdf, preloadParticipationCardPdf } from "@/lib/participation-card-pdf"
+import { isChunkLoadError } from "@/lib/utils"
 
 const QRCode = dynamic(() => import("react-qr-code"), {
   ssr: false,
@@ -32,29 +33,14 @@ interface QRCodeModalProps {
   competitionNotes?: string | null
   bannerImageUrl?: string | null
   fullWidth?: boolean
-}
-
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  font: string
-): string[] {
-  ctx.font = font
-  const words = text.split(" ")
-  const lines: string[] = []
-  let current = ""
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word
-    if (ctx.measureText(test).width > maxWidth && current) {
-      lines.push(current)
-      current = word
-    } else {
-      current = test
-    }
-  }
-  if (current) lines.push(current)
-  return lines
+  /**
+   * Controlled use: pass `open` and the dialog renders no button of its own,
+   * so one dialog can serve a whole table. Remount it (a `key`) per ticket.
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Where focus goes on close; by default Radix returns it to the trigger. */
+  onCloseAutoFocus?: (event: Event) => void
 }
 
 function drawRoundRect(
@@ -155,7 +141,7 @@ async function generateTicketCanvas(
   const [qrImg, posterImg, logoImg] = await Promise.all([
     loadSvgAsImage(svgEl),
     opts.bannerImageUrl ? loadImageFromUrl(opts.bannerImageUrl) : Promise.resolve(null),
-    loadImageFromUrl("/brand_logo.avif"),
+    loadImageFromUrl("/brand_logo_440.avif"),
   ])
 
   const W = 600
@@ -309,19 +295,34 @@ export function QRCodeModal({
   competitionNotes,
   bannerImageUrl,
   fullWidth = false,
+  open: openProp,
+  onOpenChange,
+  onCloseAutoFocus,
 }: QRCodeModalProps) {
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const qrRef = useRef<HTMLDivElement>(null)
 
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : openState
   const isEntryCard = competitionNumber != null
+
+  function handleOpenChange(next: boolean) {
+    if (!isControlled) setOpenState(next)
+    onOpenChange?.(next)
+  }
+
+  // Fetch the PDF library while the card is on screen, before the click.
+  useEffect(() => {
+    if (open && isEntryCard) preloadParticipationCardPdf()
+  }, [open, isEntryCard])
 
   async function handleDownload() {
     setDownloading(true)
     try {
       if (isEntryCard) {
         // Competition participation card: plain details PDF, no ticket art / QR
-        downloadParticipationCardPdf(
+        await downloadParticipationCardPdf(
           {
             chestNumber: competitionNumber!,
             participantName,
@@ -363,28 +364,34 @@ export function QRCodeModal({
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
       }, "image/png")
-    } catch {
-      toast.error(isEntryCard ? "Failed to generate participation card" : "Failed to generate ticket")
+    } catch (error) {
+      toast.error(
+        isEntryCard && isChunkLoadError(error)
+          ? "Could not load the PDF tool. Check your connection, refresh the page and try again."
+          : isEntryCard ? "Failed to generate participation card" : "Failed to generate ticket"
+      )
     } finally {
       setDownloading(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {fullWidth ? (
-          <Button variant="outline" size="sm" className="w-full" aria-label={isEntryCard ? "View participation card" : "View QR code"}>
-            {isEntryCard ? <Hash className="h-3.5 w-3.5 mr-1.5" /> : <QrCode className="h-3.5 w-3.5 mr-1.5" />}
-            {isEntryCard ? "View & Download Participation Card" : "View QR & Download Ticket"}
-          </Button>
-        ) : (
-          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={isEntryCard ? "View participation card" : "View QR code"}>
-            {isEntryCard ? <Hash className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          {fullWidth ? (
+            <Button variant="outline" size="sm" className="w-full" aria-label={isEntryCard ? "View participation card" : "View QR code"}>
+              {isEntryCard ? <Hash className="h-3.5 w-3.5 mr-1.5" /> : <QrCode className="h-3.5 w-3.5 mr-1.5" />}
+              {isEntryCard ? "View & Download Participation Card" : "View QR & Download Ticket"}
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={isEntryCard ? "View participation card" : "View QR code"}>
+              {isEntryCard ? <Hash className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
+      <DialogContent className="sm:max-w-sm" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{isEntryCard ? "Participation Card" : "Ticket QR Code"}</DialogTitle>
         </DialogHeader>

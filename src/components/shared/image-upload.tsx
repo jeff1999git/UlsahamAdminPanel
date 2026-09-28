@@ -6,7 +6,8 @@ import { Upload, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_MB } from "@/constants"
+import { resizeImageForUpload } from "@/lib/image-resize"
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_BYTES, MAX_IMAGE_SIZE_MB } from "@/constants"
 
 interface ImageUploadProps {
   value?: string
@@ -37,25 +38,27 @@ export function ImageUpload({
         return
       }
 
-      const maxBytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
-      if (file.size > maxBytes) {
-        toast.error(`Image must be smaller than ${MAX_IMAGE_SIZE_MB}MB`)
-        return
-      }
-
       const localPreview = URL.createObjectURL(file)
       setPreview(localPreview)
       setUploading(true)
 
       try {
+        // Photos are shrunk first, so the size limit applies to what is sent.
+        const upload = await resizeImageForUpload(file)
+        if (upload.size > MAX_IMAGE_SIZE_BYTES) {
+          throw new Error(`Image must be smaller than ${MAX_IMAGE_SIZE_MB}MB`)
+        }
+
         const formData = new FormData()
-        formData.append("file", file)
+        formData.append("file", upload)
 
         const res = await fetch("/api/admin/upload", {
           method: "POST",
           body: formData,
         })
 
+        // Vercel answers an oversized body itself, without JSON.
+        if (res.status === 413) throw new Error("Image too large")
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: "Upload failed" }))
           throw new Error(err.error ?? "Upload failed")
@@ -98,6 +101,7 @@ export function ImageUpload({
             src={preview}
             alt="Event banner preview"
             fill
+            sizes="(min-width: 1024px) 33vw, 100vw"
             className="object-cover"
             unoptimized={preview.startsWith("blob:")}
           />

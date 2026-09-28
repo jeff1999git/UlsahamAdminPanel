@@ -3,13 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { NativeSelect } from "@/components/ui/native-select"
 import { LOG_ACTION_LABELS } from "@/constants"
 
 interface LogsFilterProps {
@@ -52,22 +46,19 @@ export function LogsFilter({ defaultSearch, defaultAction }: LogsFilterProps) {
         />
       </form>
 
-      <Select
+      <NativeSelect
+        wrapperClassName="w-[200px]"
+        aria-label="Filter by action"
         defaultValue={defaultAction ?? "all"}
-        onValueChange={(value) => navigate("action", value)}
+        onChange={(e) => navigate("action", e.target.value)}
       >
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="All Actions" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Actions</SelectItem>
-          {Object.entries(LOG_ACTION_LABELS).map(([value, label]) => (
-            <SelectItem key={value} value={value}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <option value="all">All Actions</option>
+        {Object.entries(LOG_ACTION_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </NativeSelect>
     </div>
   )
 }

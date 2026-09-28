@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { ParticipantForm } from "@/components/participants/participant-form"
+import { LazyParticipantForm } from "@/components/participants/lazy-participant-form"
 
 interface AddParticipantDialogProps {
   eventId: string
@@ -31,7 +31,7 @@ export function AddParticipantDialog({ eventId }: AddParticipantDialogProps) {
         <DialogHeader>
           <DialogTitle>Add Participant</DialogTitle>
         </DialogHeader>
-        <ParticipantForm
+        <LazyParticipantForm
           eventId={eventId}
           onSuccess={() => setOpen(false)}
         />

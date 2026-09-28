@@ -7,11 +7,19 @@ import {
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_SIZE_BYTES,
 } from "@/constants"
+import type { AdminRole } from "@prisma/client"
+
+// Uploads come from the event form and the settings page. Counter staff (USER)
+// use neither, so they may not write to Cloudinary.
+const UPLOAD_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN"]
 
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!UPLOAD_ROLES.includes(session.user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
   try {

@@ -1,6 +1,26 @@
 import { z } from "zod"
-import { EventStatus, ParticipationType } from "@prisma/client"
+import type { EventStatus, ParticipationType } from "@prisma/client"
 import { hasEventEnded } from "@/lib/event-time"
+
+// The enum values as plain literals. The event form runs this schema in the
+// browser, and importing the Prisma enums as values would pull the Prisma
+// browser runtime (~16 KB gzip) into its bundle; type-only imports cost nothing.
+// A Record keyed by the enum type must name every Prisma value and nothing
+// else, so a schema change fails the type check until these are updated.
+const EVENT_STATUS_KEYS: Record<EventStatus, true> = {
+  ANNOUNCED: true,
+  PUBLISHED: true,
+  BOOKING_CLOSED: true,
+  CANCELLED: true,
+  COMPLETED: true,
+}
+const PARTICIPATION_TYPE_KEYS: Record<ParticipationType, true> = {
+  INDIVIDUAL: true,
+  GROUP: true,
+  BOTH: true,
+}
+const EVENT_STATUSES = Object.keys(EVENT_STATUS_KEYS) as [EventStatus, ...EventStatus[]]
+const PARTICIPATION_TYPES = Object.keys(PARTICIPATION_TYPE_KEYS) as [ParticipationType, ...ParticipationType[]]
 
 const complimentaryCodeSchema = z.object({
   code: z
@@ -69,13 +89,13 @@ const baseEventSchema = z.object({
   amount: z.coerce.number().positive("Amount must be positive").optional().nullable(),
   earlyBirdAmount: z.coerce.number().positive("Early bird amount must be positive").optional().nullable(),
   isEarlyBird: z.boolean().default(false),
-  status: z.nativeEnum(EventStatus).default(EventStatus.ANNOUNCED),
+  status: z.enum(EVENT_STATUSES).default("ANNOUNCED"),
   capacity: z.coerce.number().int().positive("Capacity must be a positive integer").optional().nullable(),
   featured: z.boolean().default(false),
   gstEnabled: z.boolean().default(false),
   platformFeeEnabled: z.boolean().default(true),
   isCompetition: z.boolean().default(false),
-  participationType: z.nativeEnum(ParticipationType).default(ParticipationType.INDIVIDUAL),
+  participationType: z.enum(PARTICIPATION_TYPES).default("INDIVIDUAL"),
   groupExtraAmount: z.coerce
     .number()
     .positive("Extra member amount must be positive")
@@ -124,7 +144,7 @@ export const createEventSchema = baseEventSchema
       if (
         data.isCompetition &&
         !data.isFree &&
-        data.participationType !== ParticipationType.INDIVIDUAL &&
+        data.participationType !== "INDIVIDUAL" &&
         (data.groupExtraAmount === undefined || data.groupExtraAmount === null)
       ) {
         return false
@@ -140,7 +160,7 @@ export const createEventSchema = baseEventSchema
   // edit form reuses this schema, so an event that really has ended stays valid.
   .refine(
     (data) => {
-      if (data.status !== EventStatus.COMPLETED) return true
+      if (data.status !== "COMPLETED") return true
       if (!data.date || !data.endTime) return false
       return hasEventEnded({ date: data.date, startTime: data.startTime, endTime: data.endTime })
     },
@@ -171,7 +191,7 @@ export const updateEventSchema = baseEventSchema
         data.isCompetition === true &&
         data.isFree === false &&
         data.participationType !== undefined &&
-        data.participationType !== ParticipationType.INDIVIDUAL &&
+        data.participationType !== "INDIVIDUAL" &&
         (data.groupExtraAmount === undefined || data.groupExtraAmount === null)
       ) {
         return false

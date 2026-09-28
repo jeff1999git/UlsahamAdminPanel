@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPublishedEventBySlug } from "@/services/event.service"
-import { eventDetailRateLimit, getClientIP } from "@/lib/ratelimit"
+import { getPublishedEventBySlug, toPublicEvent } from "@/services/event.service"
+import { eventDetailRateLimit, allow, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
+import { startServerTiming } from "@/lib/server-timing"
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request)
@@ -13,20 +14,20 @@ export async function GET(
 ) {
   const origin = request.headers.get("origin")
   const corsHeaders = getCorsHeaders(origin)
+  const timing = startServerTiming()
 
   const ip = getClientIP(request)
-  const { success } = await eventDetailRateLimit.limit(ip)
-  if (!success) {
+  if (!(await timing.time("rl", () => allow(eventDetailRateLimit, ip)))) {
     return NextResponse.json(
       { success: false, error: "Too many requests. Please try again later." },
-      { status: 429, headers: corsHeaders }
+      { status: 429, headers: { ...corsHeaders, ...timing.headers() } }
     )
   }
 
   const { slug } = await params
 
   try {
-    const event = await getPublishedEventBySlug(slug)
+    const event = await getPublishedEventBySlug(slug, timing)
 
     if (!event) {
       return NextResponse.json(
@@ -35,9 +36,11 @@ export async function GET(
       )
     }
 
+    await timing.ping()
+
     return NextResponse.json(
-      { success: true, data: { event } },
-      { headers: corsHeaders }
+      { success: true, data: { event: toPublicEvent(event) } },
+      { headers: { ...corsHeaders, ...timing.headers() } }
     )
   } catch (error) {
     console.error("Event detail API error:", error)

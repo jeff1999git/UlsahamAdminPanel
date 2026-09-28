@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { ResetPasswordDialog } from "@/components/admin/reset-password-dialog"
 import { toggleAdminActiveAction, deleteAdminAction } from "@/actions/admin.actions"
 import { formatDate } from "@/lib/utils"
+import { ACTION_FAILED_MESSAGE } from "@/constants"
 import type { AdminRole } from "@prisma/client"
 
 interface AdminRow {
@@ -52,22 +53,30 @@ export function AdminTable({ admins }: AdminTableProps) {
 
   function handleToggle(adminId: string, isActive: boolean) {
     startTransition(async () => {
-      const result = await toggleAdminActiveAction(adminId, isActive)
-      if (result.success) {
-        toast.success(isActive ? "Account activated" : "Account deactivated")
-      } else {
-        toast.error(result.error)
+      try {
+        const result = await toggleAdminActiveAction(adminId, isActive)
+        if (result.success) {
+          toast.success(isActive ? "Account activated" : "Account deactivated")
+        } else {
+          toast.error(result.error)
+        }
+      } catch {
+        toast.error(ACTION_FAILED_MESSAGE)
       }
     })
   }
 
   function handleDelete(adminId: string) {
     startTransition(async () => {
-      const result = await deleteAdminAction(adminId)
-      if (result.success) {
-        toast.success("Account deleted")
-      } else {
-        toast.error(result.error)
+      try {
+        const result = await deleteAdminAction(adminId)
+        if (result.success) {
+          toast.success("Account deleted")
+        } else {
+          toast.error(result.error)
+        }
+      } catch {
+        toast.error(ACTION_FAILED_MESSAGE)
       }
     })
   }

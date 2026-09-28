@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { checkTicketCode } from "@/services/participant.service"
-import { checkTicketRateLimit, getClientIP } from "@/lib/ratelimit"
+import { checkTicketRateLimit, allow, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 
 export async function OPTIONS(request: NextRequest) {
@@ -12,8 +12,7 @@ export async function GET(request: NextRequest) {
   const corsHeaders = getCorsHeaders(origin)
 
   const ip = getClientIP(request)
-  const { success } = await checkTicketRateLimit.limit(ip)
-  if (!success) {
+  if (!(await allow(checkTicketRateLimit, ip))) {
     return NextResponse.json(
       { success: false, error: "Too many requests. Please try again later." },
       { status: 429, headers: corsHeaders }

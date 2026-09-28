@@ -4,14 +4,11 @@ import {
   findParticipantByTicketCode,
   findParticipantByEventAndOrderId,
   findParticipantByTicketCodeOnly,
-  listParticipants,
   getAllParticipantsForEvent,
   createParticipant,
   updateParticipant,
   deleteParticipant,
   countParticipantsForEvent,
-  markAttendance,
-  markAttendanceByCode,
   scanParticipantByCode,
   scanParticipantGlobal,
   addEnteredCount,
@@ -19,20 +16,11 @@ import {
 import { findEventById, allocateCompetitionNumber } from "@/repositories/event.repository"
 import { generateTicketCode } from "@/lib/ticket-code"
 import { validateCompetitionQuantity } from "@/lib/competition"
-import { sanitizeString } from "@/lib/utils"
+import { sanitizeString } from "@/lib/sanitize"
 import type {
   CreateParticipantInput,
   UpdateParticipantInput,
-  ParticipantListParams,
 } from "@/types/participant.types"
-
-export async function getParticipantById(id: string) {
-  return findParticipantById(id)
-}
-
-export async function getParticipants(params: ParticipantListParams) {
-  return listParticipants(params)
-}
 
 export async function getAllParticipants(eventId: string) {
   return getAllParticipantsForEvent(eventId)
@@ -183,16 +171,8 @@ export async function toggleAttendance(id: string, attended: boolean) {
   })
 }
 
-export async function scanAndMarkAttendance(ticketCode: string, eventId: string) {
-  return markAttendance(ticketCode, eventId)
-}
-
 export async function checkTicketCode(ticketCode: string) {
   return findParticipantByTicketCode(ticketCode)
-}
-
-export async function scanGlobal(ticketCode: string) {
-  return markAttendanceByCode(ticketCode)
 }
 
 export async function scanForEntry(ticketCode: string, eventId: string) {

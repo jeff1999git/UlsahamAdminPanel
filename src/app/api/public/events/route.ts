@@ -1,34 +1,44 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPublishedEvents } from "@/services/event.service"
-import { eventsListRateLimit, getClientIP } from "@/lib/ratelimit"
+import { eventsListRateLimit, allow, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
+import { parsePositiveInt } from "@/lib/query-params"
+import { startServerTiming } from "@/lib/server-timing"
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request)
 }
 
+function parseFlag(value: string | null): boolean | undefined {
+  if (value === "true") return true
+  if (value === "false") return false
+  return undefined
+}
+
 export async function GET(request: NextRequest) {
   const origin = request.headers.get("origin")
   const corsHeaders = getCorsHeaders(origin)
+  const timing = startServerTiming()
 
   const ip = getClientIP(request)
-  const { success } = await eventsListRateLimit.limit(ip)
-  if (!success) {
+  if (!(await timing.time("rl", () => allow(eventsListRateLimit, ip)))) {
     return NextResponse.json(
       { success: false, error: "Too many requests. Please try again later." },
-      { status: 429, headers: corsHeaders }
+      { status: 429, headers: { ...corsHeaders, ...timing.headers() } }
     )
   }
 
   try {
     const { searchParams } = new URL(request.url)
-    const page = Math.min(Math.max(parseInt(searchParams.get("page") ?? "1"), 1), 1000)
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "10"), 1), 50)
-    const featured = searchParams.get("featured") === "true" ? true : undefined
+    const page = parsePositiveInt(searchParams.get("page"), 1, 1000)
+    const limit = parsePositiveInt(searchParams.get("limit"), 10, 50)
+    // featured=false lists only the events that are not featured.
+    const featured = parseFlag(searchParams.get("featured"))
     const upcoming = searchParams.get("upcoming") === "true" ? true : undefined
     const past = searchParams.get("past") === "true" ? true : undefined
 
-    const result = await getPublishedEvents({ page, limit, featured, upcoming, past })
+    const result = await getPublishedEvents({ page, limit, featured, upcoming, past }, timing)
+    await timing.ping()
 
     return NextResponse.json(
       {
@@ -40,7 +50,7 @@ export async function GET(request: NextRequest) {
           totalPages: result.totalPages,
         },
       },
-      { headers: corsHeaders }
+      { headers: { ...corsHeaders, ...timing.headers() } }
     )
   } catch (error) {
     console.error("Public events API error:", error)

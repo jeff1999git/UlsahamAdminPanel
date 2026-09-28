@@ -1,33 +1,94 @@
+import { after } from "next/server"
 import {
   findEventById,
   findEventBySlug,
   findPublishedEventBySlug,
-  listEvents,
+  listEventsForAdmin,
   listPublishedEvents,
   autoCompleteExpiredEvents,
   createEvent,
   updateEvent,
   deleteEvent,
-  getDashboardStats,
+  getDashboardStats as readDashboardStats,
   findEventCoupons,
   findEventComplimentaryCodes,
   incrementComplimentaryCodeUsage,
 } from "@/repositories/event.repository"
 import { countParticipantsForEvent, sumParticipantsForEvents } from "@/repositories/participant.repository"
-import { deleteImage } from "@/lib/cloudinary"
 import { generateSlug } from "@/lib/slug"
-import { sanitizeString } from "@/lib/utils"
+import { sanitizeString } from "@/lib/sanitize"
+import { getEffectiveAmount } from "@/lib/pricing"
 import { hasEventEnded } from "@/lib/event-time"
+import { noTiming, type ServerTiming } from "@/lib/server-timing"
 import {
   getEffectiveStatus,
   getBookingClosedReason,
   getBookingClosedMessage,
   COMPLETED_IS_AUTOMATIC,
 } from "@/lib/event-status"
-import type { CreateEventInput, UpdateEventInput, EventListParams } from "@/types/event.types"
+import type {
+  CreateEventInput,
+  UpdateEventInput,
+  EventListParams,
+  EventListResult,
+  PublicEvent,
+  PublicEventListItem,
+} from "@/types/event.types"
 import type { EventStatus } from "@prisma/client"
 
 export { COMPLETED_IS_AUTOMATIC }
+
+// Cloudinary (and its lodash) is needed only when an image is replaced or an
+// event deleted, so it is loaded then rather than on every public read.
+async function deleteImage(publicId: string) {
+  const cloudinary = await import("@/lib/cloudinary")
+  return cloudinary.deleteImage(publicId)
+}
+
+// The COMPLETED sweep (autoCompleteExpiredEvents) runs at most once a minute
+// per server instance. Reads that derive status from the clock
+// (getEffectiveStatus) stay correct without it, so they only schedule it to run
+// after the response. The past list filters on the stored COMPLETED, so it
+// waits for a due or running sweep: an event that just ended joins it at most
+// about a minute later.
+const SWEEP_INTERVAL_MS = 60_000
+let lastSweepAt = 0
+// Claimed by a read that does not wait, and not started yet: it runs after that
+// read's response, unless a past-list read (the home page asks for both lists
+// at once) needs it first and runs it itself.
+let sweepPending = false
+let sweepInFlight: Promise<void> | null = null
+
+function claimSweep(): boolean {
+  const now = Date.now()
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) return false
+  lastSweepAt = now
+  return true
+}
+
+function runSweep(): Promise<void> {
+  sweepPending = false
+  sweepInFlight ??= autoCompleteExpiredEvents()
+    .then(
+      () => undefined,
+      (error) => console.error("COMPLETED sweep failed:", error)
+    )
+    .finally(() => {
+      sweepInFlight = null
+    })
+  return sweepInFlight
+}
+
+function scheduleSweepIfDue() {
+  if (!claimSweep()) return
+  sweepPending = true
+  after(() => (sweepPending ? runSweep() : undefined))
+}
+
+function awaitSweepIfDue(): Promise<void> {
+  if (claimSweep() || sweepPending) return runSweep()
+  return sweepInFlight ?? Promise.resolve()
+}
 
 /**
  * Everything the public site needs to decide whether the booking form opens:
@@ -57,34 +118,28 @@ function assertStatusIsSelectable(
   }
 }
 
-function getEffectiveAmount(event: {
-  isFree: boolean
-  amount: number | null
-  isEarlyBird?: boolean
-  earlyBirdAmount?: number | null
-}): number | null {
-  if (event.isFree) return null
-  if (event.isEarlyBird && event.earlyBirdAmount != null) return event.earlyBirdAmount
-  return event.amount
-}
-
 export async function getEventById(id: string) {
   return findEventById(id)
 }
 
-export async function getEventBySlug(slug: string) {
-  return findEventBySlug(slug)
-}
-
-export async function getPublishedEventBySlug(slug: string) {
-  const event = await findPublishedEventBySlug(slug)
+/**
+ * The full bookable event (every column except the coupon and complimentary
+ * codes, lastCompetitionNumber and the Cloudinary ids) plus booking state. The
+ * booking and payment routes price from this object, so it is never trimmed;
+ * the public detail route narrows it with toPublicEvent.
+ */
+export async function getPublishedEventBySlug(slug: string, timing: ServerTiming = noTiming) {
+  const event = await timing.time("event", () => findPublishedEventBySlug(slug))
   if (!event) return null
 
-  const registeredCount = await countParticipantsForEvent(event.id)
+  // Bookings are deleted two weeks after the event; their seat total is kept
+  // in archivedParticipantCount.
+  const liveCount = await timing.time("sums", () => countParticipantsForEvent(event.id))
+  const registeredCount = liveCount || event.archivedParticipantCount || 0
   const isFull = event.capacity !== null && registeredCount >= event.capacity
   const effectiveAmount = getEffectiveAmount(event)
 
-  const { _count, bannerImageId, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...publicFields } = event
+  const { bannerImageId, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...publicFields } = event
   return {
     ...publicFields,
     ...getPublicBookingState(event, isFull),
@@ -95,46 +150,88 @@ export async function getPublishedEventBySlug(slug: string) {
   }
 }
 
-export async function getEvents(params: EventListParams) {
-  await autoCompleteExpiredEvents()
-  const result = await listEvents(params)
+/** The public event detail, as an allow-list: only fields the site reads. */
+export function toPublicEvent(event: PublicEvent): PublicEvent {
+  return {
+    id: event.id,
+    name: event.name,
+    slug: event.slug,
+    description: event.description,
+    bannerImageUrl: event.bannerImageUrl,
+    galleryImageUrls: event.galleryImageUrls,
+    venue: event.venue,
+    venueLink: event.venueLink,
+    date: event.date,
+    startTime: event.startTime,
+    endTime: event.endTime,
+    status: event.status,
+    featured: event.featured,
+    isFree: event.isFree,
+    amount: event.amount,
+    earlyBirdAmount: event.earlyBirdAmount,
+    isEarlyBird: event.isEarlyBird,
+    effectiveAmount: event.effectiveAmount,
+    gstEnabled: event.gstEnabled,
+    platformFeeEnabled: event.platformFeeEnabled,
+    isCompetition: event.isCompetition,
+    participationType: event.participationType,
+    groupExtraAmount: event.groupExtraAmount,
+    competitionInstructions: event.competitionInstructions,
+    competitionNotes: event.competitionNotes,
+    capacity: event.capacity,
+    registeredCount: event.registeredCount,
+    isFull: event.isFull,
+    bookingOpen: event.bookingOpen,
+    bookingClosedReason: event.bookingClosedReason,
+    bookingClosedMessage: event.bookingClosedMessage,
+  }
+}
+
+export async function getEvents(params: EventListParams): Promise<EventListResult> {
+  scheduleSweepIfDue()
+  const result = await listEventsForAdmin(params)
   const sums = await sumParticipantsForEvents(result.events.map((event) => event.id))
-  const events = result.events.map((event) => ({
+  const events = result.events.map(({ archivedParticipantCount, ...event }) => ({
     ...event,
-    registeredCount: sums[event.id] ?? event.archivedParticipantCount ?? 0,
+    // The sweep runs after this response, so show what it will store: a live
+    // event past its end time reads Completed. Drafts are never swept.
+    status: event.status === "ANNOUNCED" ? event.status : getEffectiveStatus(event),
+    registeredCount: sums[event.id] ?? archivedParticipantCount ?? 0,
   }))
   return { ...result, events }
 }
 
-export async function getPublishedEvents(params: {
-  page?: number
-  limit?: number
-  featured?: boolean
-  upcoming?: boolean
-  past?: boolean
-}) {
-  await autoCompleteExpiredEvents()
-  const result = await listPublishedEvents(params)
+export async function getPublishedEvents(
+  params: {
+    page?: number
+    limit?: number
+    featured?: boolean
+    upcoming?: boolean
+    past?: boolean
+  },
+  timing: ServerTiming = noTiming
+) {
+  if (params.past) await timing.time("sweep", awaitSweepIfDue)
+  else scheduleSweepIfDue()
+  const result = await timing.time("list", () => listPublishedEvents(params))
 
   // Seats booked = sum of numberOfParticipants across bookings (a person may
   // hold several bookings), matching getPublishedEventBySlug — not row count.
-  const sums = await sumParticipantsForEvents(result.events.map((event) => event.id))
+  const sums = await timing.time("sums", () => sumParticipantsForEvents(result.events.map((event) => event.id)))
 
-  const eventsWithMeta = result.events.map((event) => {
-    const registeredCount = sums[event.id] ?? event.archivedParticipantCount ?? 0
-    const isFull = event.capacity !== null && registeredCount >= event.capacity
-    const effectiveAmount = getEffectiveAmount(event)
-    const { _count, couponCodes, complimentaryCodes, lastCompetitionNumber, galleryImages, ...rest } = event
-    return {
-      ...rest,
-      ...getPublicBookingState(event, isFull),
-      registeredCount,
-      isFull,
-      effectiveAmount,
-    }
+  const events: PublicEventListItem[] = result.events.map(({ capacity, archivedParticipantCount, ...event }) => {
+    const registeredCount = sums[event.id] ?? archivedParticipantCount ?? 0
+    const isFull = capacity !== null && registeredCount >= capacity
+    const { status, bookingOpen, bookingClosedReason } = getPublicBookingState(event, isFull)
+    return { ...event, status, isFull, bookingOpen, bookingClosedReason }
   })
 
-  return { ...result, events: eventsWithMeta }
+  return { ...result, events }
+}
+
+export async function getDashboardStats() {
+  scheduleSweepIfDue()
+  return readDashboardStats()
 }
 
 export async function createNewEvent(input: CreateEventInput) {
@@ -306,4 +403,4 @@ export async function toggleEventStatus(id: string, status: EventStatus) {
   return updateEvent(id, { status })
 }
 
-export { getDashboardStats, findEventCoupons, findEventComplimentaryCodes, incrementComplimentaryCodeUsage }
+export { findEventCoupons, findEventComplimentaryCodes, incrementComplimentaryCodeUsage }

@@ -11,3 +11,11 @@ export const prisma =
   })
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+
+// Start connecting as soon as a route loads, so the engine start and MongoDB
+// handshake overlap the rate-limit call instead of waiting for the first
+// query. Never during `next build`, which loads route modules but must not
+// reach the database. A failed early connect is retried by the first query.
+if (process.env.NEXT_PHASE !== "phase-production-build") {
+  prisma.$connect().catch(() => {})
+}

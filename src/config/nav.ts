@@ -16,6 +16,8 @@ export interface NavItem {
   superAdminOnly?: boolean
   adminOnly?: boolean
   headerOnly?: boolean
+  /** false: a page staff rarely open, so its link is not prefetched. */
+  prefetch?: false
 }
 
 export const adminNavItems: NavItem[] = [
@@ -55,5 +57,6 @@ export const adminNavItems: NavItem[] = [
     href: "/admin/logs",
     icon: ScrollText,
     adminOnly: true,
+    prefetch: false,
   },
 ]

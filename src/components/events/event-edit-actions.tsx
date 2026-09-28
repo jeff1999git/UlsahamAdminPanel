@@ -1,12 +1,13 @@
 "use client"
 
 import { useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { unstable_rethrow } from "next/navigation"
 import { Eye, EyeOff, Lock, Unlock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { toggleEventStatusAction, deleteEventAction } from "@/actions/event.actions"
+import { ACTION_FAILED_MESSAGE, WEBSITE_UPDATE_NOTE_EVENTS } from "@/constants"
 import type { EventStatus } from "@prisma/client"
 
 interface EventEditActionsProps {
@@ -15,8 +16,17 @@ interface EventEditActionsProps {
   participantCount: number
 }
 
+/** True for the error a server action's redirect() arrives as. */
+function isNavigationError(error: unknown) {
+  try {
+    unstable_rethrow(error)
+    return false
+  } catch {
+    return true
+  }
+}
+
 export function EventEditActions({ eventId, status, participantCount }: EventEditActionsProps) {
-  const router = useRouter()
   const [, startTransition] = useTransition()
 
   const canToggle = status !== "CANCELLED" && status !== "COMPLETED"
@@ -25,12 +35,16 @@ export function EventEditActions({ eventId, status, participantCount }: EventEdi
 
   function changeStatus(newStatus: EventStatus, successMessage: string) {
     startTransition(async () => {
-      const result = await toggleEventStatusAction(eventId, newStatus)
-      if (result.success) {
-        toast.success(successMessage)
-        router.refresh()
-      } else {
-        toast.error(result.error)
+      try {
+        // The action's revalidatePath brings the refreshed page back with its result.
+        const result = await toggleEventStatusAction(eventId, newStatus)
+        if (result.success) {
+          toast.success(successMessage, { description: WEBSITE_UPDATE_NOTE_EVENTS })
+        } else {
+          toast.error(result.error)
+        }
+      } catch {
+        toast.error(ACTION_FAILED_MESSAGE)
       }
     })
   }
@@ -43,12 +57,19 @@ export function EventEditActions({ eventId, status, participantCount }: EventEdi
   }
 
   async function handleDelete() {
-    const result = await deleteEventAction(eventId)
-    if (result.success) {
-      toast.success("Event deleted")
-      router.push("/admin/events")
-    } else {
-      toast.error(result.error)
+    try {
+      const result = await deleteEventAction(eventId)
+      // A successful delete redirects to the events list, so only a failure returns.
+      if (result && !result.success) toast.error(result.error)
+    } catch (error) {
+      if (isNavigationError(error)) {
+        // The delete worked, and the router has already applied the events
+        // list this action rendered. Rethrowing would only make Next.js
+        // navigate there a second time.
+        toast.success("Event deleted", { description: WEBSITE_UPDATE_NOTE_EVENTS })
+        return
+      }
+      toast.error(ACTION_FAILED_MESSAGE)
     }
   }
 

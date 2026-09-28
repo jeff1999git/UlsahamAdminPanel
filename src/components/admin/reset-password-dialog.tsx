@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { resetPasswordSchema, type ResetPasswordFormValues } from "@/validators/admin.validator"
 import { resetAdminPasswordAction } from "@/actions/admin.actions"
+import { ACTION_FAILED_MESSAGE } from "@/constants"
 
 interface ResetPasswordDialogProps {
   adminId: string
@@ -44,14 +45,18 @@ export function ResetPasswordDialog({ adminId, adminUsername }: ResetPasswordDia
     fd.append("newPassword", values.newPassword)
     fd.append("confirmPassword", values.confirmPassword)
 
-    const result = await resetAdminPasswordAction(fd)
+    try {
+      const result = await resetAdminPasswordAction(fd)
 
-    if (result.success) {
-      toast.success(`Password reset for "${adminUsername}"`)
-      form.reset({ adminId, newPassword: "", confirmPassword: "" })
-      setOpen(false)
-    } else {
-      toast.error(result.error)
+      if (result.success) {
+        toast.success(`Password reset for "${adminUsername}"`)
+        form.reset({ adminId, newPassword: "", confirmPassword: "" })
+        setOpen(false)
+      } else {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error(ACTION_FAILED_MESSAGE)
     }
   }
 

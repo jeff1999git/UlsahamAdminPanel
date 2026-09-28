@@ -1,7 +1,5 @@
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
-import type { ParticipantListParams } from "@/types/participant.types"
-import { DEFAULT_PAGE_SIZE } from "@/constants"
 
 export async function findParticipantById(id: string) {
   return prisma.participant.findUnique({
@@ -26,7 +24,28 @@ export async function findParticipantsByTicketCodes(ticketCodes: string[]) {
     where: { ticketCode: { in: ticketCodes } },
     include: {
       event: {
-        select: { id: true, name: true, slug: true, date: true, venue: true, bannerImageUrl: true, isCompetition: true, competitionInstructions: true, competitionNotes: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          venue: true,
+          bannerImageUrl: true,
+          isFree: true,
+          amount: true,
+          earlyBirdAmount: true,
+          isEarlyBird: true,
+          groupExtraAmount: true,
+          gstEnabled: true,
+          platformFeeEnabled: true,
+          isCompetition: true,
+          participationType: true,
+          competitionInstructions: true,
+          competitionNotes: true,
+        },
       },
     },
   })
@@ -72,54 +91,40 @@ export async function findTicketCodesByPhone(phone: string) {
   })
 }
 
-export async function listParticipants(params: ParticipantListParams) {
-  const {
-    eventId,
-    page = 1,
-    limit = DEFAULT_PAGE_SIZE,
-    search,
-    attended,
-    sortBy = "registeredAt",
-    sortOrder = "desc",
-  } = params
-
-  const where: Prisma.ParticipantWhereInput = { eventId }
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { phone: { contains: search } },
-      { ticketCode: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } },
-    ]
-  }
-
-  if (attended !== undefined && attended !== "") {
-    where.attended = attended as boolean
-  }
-
-  const [participants, total] = await Promise.all([
-    prisma.participant.findMany({
-      where,
-      orderBy: { [sortBy]: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.participant.count({ where }),
-  ])
-
-  return {
-    participants,
-    total,
-    page,
-    totalPages: Math.ceil(total / limit),
-  }
-}
-
 export async function getAllParticipantsForEvent(eventId: string) {
   return prisma.participant.findMany({
     where: { eventId },
     orderBy: { registeredAt: "asc" },
+  })
+}
+
+/**
+ * The participants page's rows: the columns its table shows, plus the three
+ * fields entryStatusOf reads, which the page drops before the rows reach the
+ * browser. The Excel export keeps getAllParticipantsForEvent.
+ */
+export async function getParticipantRowsForEvent(eventId: string) {
+  return prisma.participant.findMany({
+    where: { eventId },
+    orderBy: { registeredAt: "asc" },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      age: true,
+      numberOfParticipants: true,
+      ticketCode: true,
+      competitionNumber: true,
+      isGroupRegistration: true,
+      amountPaid: true,
+      attended: true,
+      attendedAt: true,
+      registeredAt: true,
+      entryType: true,
+      paymentId: true,
+      paymentOrderId: true,
+    },
   })
 }
 
@@ -153,45 +158,30 @@ export async function sumParticipantsForEvents(eventIds: string[]): Promise<Reco
   return Object.fromEntries(groups.map((g) => [g.eventId, g._sum.numberOfParticipants ?? 0]))
 }
 
-export async function markAttendance(ticketCode: string, eventId: string) {
-  const participant = await prisma.participant.findUnique({
-    where: { ticketCode },
-  })
-
-  if (!participant) return { found: false, alreadyAttended: false, participant: null }
-  if (participant.eventId !== eventId) return { found: false, alreadyAttended: false, participant: null }
-  if (participant.attended) return { found: true, alreadyAttended: true, participant }
-
-  const updated = await prisma.participant.update({
-    where: { id: participant.id },
-    data: { attended: true, attendedAt: new Date() },
-  })
-
-  return { found: true, alreadyAttended: false, participant: updated }
-}
-
 export async function pruneOldEventParticipants() {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - 14) // 2 weeks after event date
 
-  // Find events that ended more than 2 weeks ago and still have participant records
+  // Events more than 2 weeks past; the seat sums cover only those that still
+  // hold participant records.
   const events = await prisma.event.findMany({
     where: { date: { lt: cutoff } },
-    select: { id: true, _count: { select: { participants: true } } },
+    select: { id: true },
   })
+  if (events.length === 0) return
 
-  const stale = events.filter((e) => e._count.participants > 0)
-  if (stale.length === 0) return
+  const sums = await sumParticipantsForEvents(events.map((e) => e.id))
 
-  const sums = await sumParticipantsForEvents(stale.map((e) => e.id))
-
-  for (const event of stale) {
-    // Snapshot the total participant count onto the event before deleting
-    await prisma.event.update({
-      where: { id: event.id },
-      data: { archivedParticipantCount: sums[event.id] ?? event._count.participants },
+  for (const [eventId, seats] of Object.entries(sums)) {
+    // Snapshot the seat total onto the event before deleting. Only an event
+    // not archived yet is written, so a repeated or overlapping run can never
+    // replace the total with the count of whatever rows are left. NOT/gt also
+    // matches events stored before the field existed.
+    await prisma.event.updateMany({
+      where: { id: eventId, NOT: { archivedParticipantCount: { gt: 0 } } },
+      data: { archivedParticipantCount: seats },
     })
-    await prisma.participant.deleteMany({ where: { eventId: event.id } })
+    await prisma.participant.deleteMany({ where: { eventId } })
   }
 }
 
@@ -222,38 +212,32 @@ export async function addEnteredCount(id: string, eventId: string, count: number
     throw new Error(`Entry count must be between 1 and ${remaining}`)
   }
 
-  // Atomic increment to avoid TOCTOU race under concurrent scans
-  const updated = await prisma.participant.update({
-    where: { id },
-    data: {
-      enteredCount: { increment: count },
-      attendedAt: participant.attendedAt ?? new Date(),
-    },
+  // Compare-and-set: the write applies only while enteredCount still holds the
+  // value checked above, so two gates scanning the same ticket at once cannot
+  // admit more people than it covers. The entry that fills the ticket also
+  // marks it attended, in the same write.
+  const attendance = {
+    attendedAt: participant.attendedAt ?? new Date(),
+    ...(participant.enteredCount + count >= participant.numberOfParticipants ? { attended: true } : {}),
+  }
+  const { count: written } = await prisma.participant.updateMany({
+    where: { id, eventId, enteredCount: participant.enteredCount },
+    data: { enteredCount: { increment: count }, ...attendance },
   })
 
-  // Mark fully attended when all members have entered (idempotent second write)
-  if (updated.enteredCount >= updated.numberOfParticipants && !updated.attended) {
-    return prisma.participant.update({ where: { id }, data: { attended: true } })
+  const updated = await prisma.participant.findUnique({ where: { id } })
+  if (!updated) throw new Error("Participant not found")
+  if (written === 0) {
+    // Bookings made before enteredCount existed have no such field: Prisma reads
+    // it as its default 0, but the filter above cannot match a missing field. So
+    // a miss with the count unchanged is that case, and the new count is written
+    // unguarded, as every entry was before; a changed count means another gate
+    // wrote first.
+    if (updated.enteredCount !== participant.enteredCount) throw new Error("Just scanned at another gate — rescan")
+    return prisma.participant.update({
+      where: { id },
+      data: { enteredCount: participant.enteredCount + count, ...attendance },
+    })
   }
   return updated
-}
-
-export async function markAttendanceByCode(ticketCode: string) {
-  const eventInclude = { select: { id: true, name: true, date: true, venue: true } } as const
-
-  const participant = await prisma.participant.findUnique({
-    where: { ticketCode },
-    include: { event: eventInclude },
-  })
-
-  if (!participant) return { found: false, alreadyAttended: false, participant: null }
-  if (participant.attended) return { found: true, alreadyAttended: true, participant }
-
-  const updated = await prisma.participant.update({
-    where: { id: participant.id },
-    data: { attended: true, attendedAt: new Date() },
-    include: { event: eventInclude },
-  })
-
-  return { found: true, alreadyAttended: false, participant: updated }
 }

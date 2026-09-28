@@ -7,11 +7,10 @@ import { cn } from "@/lib/utils"
 import { adminNavItems } from "@/config/nav"
 
 interface SidebarProps {
-  username: string
   role: string
 }
 
-export function Sidebar({ username, role }: SidebarProps) {
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -21,14 +20,14 @@ export function Sidebar({ username, role }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex items-center px-4 py-4 border-b border-white/10">
+        {/* No priority: the sidebar is desktop-only, and the header logo (phones) is preloaded. */}
         <Image
-          src="/brand_logo.avif"
+          src="/brand_logo_440.avif"
           alt="Ulsaham Entertainments"
           width={180}
           height={90}
           style={{ height: "auto" }}
           className="rounded-lg"
-          priority
         />
       </div>
 
@@ -48,6 +47,7 @@ export function Sidebar({ username, role }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={item.prefetch}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                   isActive
@@ -67,7 +67,7 @@ export function Sidebar({ username, role }: SidebarProps) {
   )
 }
 
-export function MobileNav({ username, role }: SidebarProps) {
+export function MobileNav({ role }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -90,14 +90,17 @@ export function MobileNav({ username, role }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={item.prefetch}
                 className={cn(
                   "flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all",
                   isActive ? "text-[#FEE715]" : "text-white/70"
                 )}
                 aria-current={isActive ? "page" : undefined}
+                aria-label={item.label}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
-                <span className="hidden xs:block">{item.label}</span>
+                {/* Icon-only bar; the label is for screen readers. */}
+                <span className="sr-only">{item.label}</span>
               </Link>
             )
           })}

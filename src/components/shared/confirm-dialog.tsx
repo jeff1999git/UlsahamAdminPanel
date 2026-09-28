@@ -15,7 +15,12 @@ import {
 import { Button } from "@/components/ui/button"
 
 interface ConfirmDialogProps {
-  trigger: React.ReactNode
+  /** The button that opens the dialog. Leave it out and pass `open` to open it from elsewhere. */
+  trigger?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Where focus goes on close; by default Radix returns it to the trigger. */
+  onCloseAutoFocus?: (event: Event) => void
   title: string
   description: string
   confirmLabel?: string
@@ -26,6 +31,9 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   trigger,
+  open: openProp,
+  onOpenChange,
+  onCloseAutoFocus,
   title,
   description,
   confirmLabel = "Confirm",
@@ -33,8 +41,16 @@ export function ConfirmDialog({
   variant = "destructive",
   onConfirm,
 }: ConfirmDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : openState
+
+  function setOpen(next: boolean) {
+    if (!isControlled) setOpenState(next)
+    onOpenChange?.(next)
+  }
 
   async function handleConfirm() {
     setLoading(true)
@@ -48,8 +64,8 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent>
+      {trigger && <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
+      <AlertDialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

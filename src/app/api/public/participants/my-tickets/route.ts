@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { myTicketsRateLimit, getClientIP } from "@/lib/ratelimit"
+import { myTicketsRateLimit, allow, getClientIP } from "@/lib/ratelimit"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { findParticipantsByTicketCodes } from "@/repositories/participant.repository"
+import { getEffectiveStatus } from "@/lib/event-status"
+import { getEffectiveAmount } from "@/lib/pricing"
 
 const MAX_CODES = 20
 
@@ -22,8 +24,7 @@ export async function POST(request: NextRequest) {
   const corsHeaders = getCorsHeaders(origin)
 
   const ip = getClientIP(request)
-  const { success: rateLimitOk } = await myTicketsRateLimit.limit(ip)
-  if (!rateLimitOk) {
+  if (!(await allow(myTicketsRateLimit, ip))) {
     return NextResponse.json(
       { success: false, error: "Too many requests. Please try again later." },
       { status: 429, headers: corsHeaders }
@@ -57,17 +58,33 @@ export async function POST(request: NextRequest) {
       numberOfParticipants: p.numberOfParticipants,
       amountPaid: p.amountPaid,
       attended: p.attended,
+      enteredCount: p.enteredCount,
       registeredAt: p.registeredAt,
       competitionNumber: p.competitionNumber,
       isGroupRegistration: p.isGroupRegistration,
+      // Times and status let the site tell "Not Attended" (after the end
+      // time) and "Cancelled" apart; the price fields let it show what an
+      // unpaid ticket will cost without loading the event.
       event: {
         id: p.event.id,
         name: p.event.name,
         slug: p.event.slug,
         date: p.event.date,
+        startTime: p.event.startTime,
+        endTime: p.event.endTime,
+        status: getEffectiveStatus(p.event),
         venue: p.event.venue,
         bannerImageUrl: p.event.bannerImageUrl,
+        isFree: p.event.isFree,
+        amount: p.event.amount,
+        earlyBirdAmount: p.event.earlyBirdAmount,
+        isEarlyBird: p.event.isEarlyBird,
+        effectiveAmount: getEffectiveAmount(p.event),
+        groupExtraAmount: p.event.groupExtraAmount,
+        gstEnabled: p.event.gstEnabled,
+        platformFeeEnabled: p.event.platformFeeEnabled,
         isCompetition: p.event.isCompetition,
+        participationType: p.event.participationType,
         competitionInstructions: p.event.competitionInstructions,
         competitionNotes: p.event.competitionNotes,
       },

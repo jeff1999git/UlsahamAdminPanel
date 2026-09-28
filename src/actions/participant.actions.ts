@@ -9,8 +9,6 @@ import {
   deleteParticipantWithCleanup,
   toggleAttendance,
   getAllParticipants,
-  getParticipants,
-  scanGlobal,
   scanForEntry,
   scanForEntryGlobal,
   markEntry,
@@ -20,7 +18,6 @@ import { findParticipantByEventAndPhone } from "@/repositories/participant.repos
 import { findEventById } from "@/repositories/event.repository"
 import type { ActionResult } from "@/types"
 import type { Participant } from "@prisma/client"
-import type { ParticipantListParams } from "@/types/participant.types"
 
 async function getSession() {
   const session = await auth()
@@ -156,7 +153,7 @@ export async function toggleAttendanceAction(
   id: string,
   eventId: string,
   attended: boolean
-): Promise<ActionResult<Participant>> {
+): Promise<ActionResult<{ attended: boolean }>> {
   const session = await getSession()
   if (session.role === "USER") return { success: false, error: "Forbidden" }
 
@@ -174,7 +171,9 @@ export async function toggleAttendanceAction(
     })
 
     revalidatePath(`/admin/events/${eventId}/participants`)
-    return { success: true, data: participant }
+    // Only what the table reads: the full row would carry the Razorpay
+    // references the participants page keeps on the server.
+    return { success: true, data: { attended: participant.attended } }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to update attendance"
     return { success: false, error: msg }
@@ -251,7 +250,9 @@ export async function confirmEntryAction(
       metadata: { eventId, ticketCode: updated.ticketCode, count, enteredCount: updated.enteredCount },
     })
 
-    revalidatePath(`/admin/events/${eventId}/participants`)
+    // No revalidatePath: it would re-render the whole scan page inside every
+    // scan's response, and the scanner uses only this result. The
+    // participants page is dynamic, so it reads fresh data when opened.
 
     return {
       success: true,
@@ -356,7 +357,7 @@ export async function confirmGlobalEntryAction(
       metadata: { eventId, ticketCode: updated.ticketCode, count, enteredCount: updated.enteredCount },
     })
 
-    revalidatePath(`/admin/events/${eventId}/participants`)
+    // No revalidatePath, as in confirmEntryAction: the scanner uses only this result.
 
     return {
       success: true,
@@ -450,10 +451,4 @@ export async function exportParticipantsAction(eventId: string) {
   const session = await getSession()
   if (session.role === "USER") throw new Error("Forbidden")
   return getAllParticipants(eventId)
-}
-
-export async function getParticipantsAction(params: ParticipantListParams) {
-  const session = await getSession()
-  if (session.role === "USER") throw new Error("Forbidden")
-  return getParticipants(params)
 }
