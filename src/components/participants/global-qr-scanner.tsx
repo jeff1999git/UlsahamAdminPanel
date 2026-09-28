@@ -20,9 +20,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { scanGlobalAttendanceAction, confirmGlobalEntryAction } from "@/actions/participant.actions"
 import type { GlobalScanData } from "@/actions/participant.actions"
+import { GATE_SCANNER_PROPS, selfHostZXingWasm } from "@/lib/gate-scanner"
 
 const Scanner = dynamic(
-  () => import("@yudiel/react-qr-scanner").then((m) => m.Scanner),
+  () =>
+    import("@yudiel/react-qr-scanner").then((m) => {
+      selfHostZXingWasm(m)
+      return m.Scanner
+    }),
   {
     ssr: false,
     loading: () => (
@@ -89,7 +94,10 @@ export function GlobalQRScanner() {
   const handleScan = useCallback(
     async (results: Array<{ rawValue: string }>) => {
       const ticketCode = results[0]?.rawValue
-      if (!ticketCode || ticketCode === lastCode || scanning || state.type === "pending") return
+      if (!ticketCode || ticketCode === lastCode || scanning) return
+      // The camera keeps running under the group-count and result cards; codes
+      // it reads there are ignored until the card is dismissed.
+      if (state.type !== "idle" && state.type !== "already") return
 
       setLastCode(ticketCode)
       setScanning(true)
@@ -173,6 +181,9 @@ export function GlobalQRScanner() {
     }
   }
 
+  // The camera is shown, and scans are accepted, only in these states. Under the
+  // group-count and result cards it stays mounted and streaming: unmounting it
+  // made every ticket wait for a camera restart before the next scan.
   const showCamera = state.type === "idle" || state.type === "already"
   const pendingData = state.type === "pending" ? state.data : null
   const remaining = pendingData ? pendingData.remaining : 1
@@ -182,26 +193,37 @@ export function GlobalQRScanner() {
       {/* Camera container */}
       <div className="relative rounded-xl overflow-hidden border-2 border-black max-w-lg mx-auto">
 
-        {showCamera && !cameraError && (
-          <Scanner
-            onScan={handleScan}
-            onError={(error) => {
-              const msg =
-                typeof error === "string"
-                  ? error
-                  : (error as { message?: string }).message ?? "Camera error"
-              setCameraError(
-                msg.toLowerCase().includes("permission")
-                  ? "Camera permission denied. Please allow camera access and try again."
-                  : "Camera error: " + msg
-              )
-            }}
-            constraints={{ facingMode: "environment" }}
-            styles={{
-              container: { width: "100%", aspectRatio: "1" },
-              video: { width: "100%", height: "100%", objectFit: "cover" },
-            }}
-          />
+        {!cameraError && (
+          // Behind a card the camera is absolutely positioned, so the card sets
+          // the height as before; isolate keeps the library's own buttons
+          // beneath the cards.
+          <div className={showCamera ? "isolate" : "absolute inset-0 isolate"}>
+            {/* sound: beep only while scans are accepted. Toggling it also
+                restarts the library's detection loop (v2.6), which forgets the
+                codes it has seen, so after a dismiss the ticket in front of the
+                camera is read again, as it was when the camera remounted. */}
+            <Scanner
+              {...GATE_SCANNER_PROPS}
+              sound={showCamera}
+              onScan={handleScan}
+              onError={(error) => {
+                const msg =
+                  typeof error === "string"
+                    ? error
+                    : (error as { message?: string }).message ?? "Camera error"
+                setCameraError(
+                  msg.toLowerCase().includes("permission")
+                    ? "Camera permission denied. Please allow camera access and try again."
+                    : "Camera error: " + msg
+                )
+              }}
+              constraints={{ facingMode: "environment" }}
+              styles={{
+                container: { width: "100%", aspectRatio: "1" },
+                video: { width: "100%", height: "100%", objectFit: "cover" },
+              }}
+            />
+          </div>
         )}
 
         {state.type === "idle" && cameraError && (
@@ -221,9 +243,9 @@ export function GlobalQRScanner() {
           </div>
         )}
 
-        {/* Multi-person count input — replaces camera */}
+        {/* Multi-person count input — covers the camera */}
         {state.type === "pending" && pendingData && (
-          <div className="bg-[#FEE715] min-h-[320px] flex flex-col p-4">
+          <div className="relative bg-[#FEE715] min-h-[320px] flex flex-col p-4">
             <div className="flex justify-end mb-1">
               <button
                 className="w-8 h-8 bg-black/10 hover:bg-black/20 rounded-full flex items-center justify-center transition-colors"
@@ -284,10 +306,10 @@ export function GlobalQRScanner() {
           </div>
         )}
 
-        {/* Success / Error */}
+        {/* Success / Error — covers the camera */}
         {(state.type === "success" || state.type === "error") && (
           <div
-            className="bg-[#FEE715] min-h-[320px] flex flex-col p-4 cursor-pointer select-none"
+            className="relative bg-[#FEE715] min-h-[320px] flex flex-col p-4 cursor-pointer select-none"
             onClick={dismiss}
           >
             <div className="flex justify-end mb-1">

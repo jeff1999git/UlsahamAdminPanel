@@ -212,18 +212,32 @@ export async function addEnteredCount(id: string, eventId: string, count: number
     throw new Error(`Entry count must be between 1 and ${remaining}`)
   }
 
-  // Atomic increment to avoid TOCTOU race under concurrent scans
-  const updated = await prisma.participant.update({
-    where: { id },
-    data: {
-      enteredCount: { increment: count },
-      attendedAt: participant.attendedAt ?? new Date(),
-    },
+  // Compare-and-set: the write applies only while enteredCount still holds the
+  // value checked above, so two gates scanning the same ticket at once cannot
+  // admit more people than it covers. The entry that fills the ticket also
+  // marks it attended, in the same write.
+  const attendance = {
+    attendedAt: participant.attendedAt ?? new Date(),
+    ...(participant.enteredCount + count >= participant.numberOfParticipants ? { attended: true } : {}),
+  }
+  const { count: written } = await prisma.participant.updateMany({
+    where: { id, eventId, enteredCount: participant.enteredCount },
+    data: { enteredCount: { increment: count }, ...attendance },
   })
 
-  // Mark fully attended when all members have entered (idempotent second write)
-  if (updated.enteredCount >= updated.numberOfParticipants && !updated.attended) {
-    return prisma.participant.update({ where: { id }, data: { attended: true } })
+  const updated = await prisma.participant.findUnique({ where: { id } })
+  if (!updated) throw new Error("Participant not found")
+  if (written === 0) {
+    // Bookings made before enteredCount existed have no such field: Prisma reads
+    // it as its default 0, but the filter above cannot match a missing field. So
+    // a miss with the count unchanged is that case, and the new count is written
+    // unguarded, as every entry was before; a changed count means another gate
+    // wrote first.
+    if (updated.enteredCount !== participant.enteredCount) throw new Error("Just scanned at another gate — rescan")
+    return prisma.participant.update({
+      where: { id },
+      data: { enteredCount: participant.enteredCount + count, ...attendance },
+    })
   }
   return updated
 }

@@ -113,8 +113,10 @@ interface MobileRowProps {
 
 const MobileRow = memo(
   function MobileRow({ p, index, attendanceMode, pending, onOpen, onPhone, onToggle }: MobileRowProps) {
+    // content-visibility: rows off screen skip layout, which every dialog's
+    // scroll lock otherwise redoes for the whole list.
     return (
-      <li className="relative flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-black/5 active:bg-black/5 transition-colors">
+      <li className="relative flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-black/5 active:bg-black/5 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_62px]">
         {/* Opens the booking. It covers the whole row, and the phone number and
             the attendance control sit above it, so no button is nested in another. */}
         <button

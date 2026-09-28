@@ -153,7 +153,7 @@ export async function toggleAttendanceAction(
   id: string,
   eventId: string,
   attended: boolean
-): Promise<ActionResult<Participant>> {
+): Promise<ActionResult<{ attended: boolean }>> {
   const session = await getSession()
   if (session.role === "USER") return { success: false, error: "Forbidden" }
 
@@ -171,7 +171,9 @@ export async function toggleAttendanceAction(
     })
 
     revalidatePath(`/admin/events/${eventId}/participants`)
-    return { success: true, data: participant }
+    // Only what the table reads: the full row would carry the Razorpay
+    // references the participants page keeps on the server.
+    return { success: true, data: { attended: participant.attended } }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to update attendance"
     return { success: false, error: msg }

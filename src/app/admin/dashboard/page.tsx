@@ -29,9 +29,13 @@ export default async function DashboardPage() {
   const isSuperAdmin = role === "SUPER_ADMIN"
 
   return (
-    <Suspense fallback={<DashboardSkeleton cards={isSuperAdmin ? 5 : 4} />}>
-      <DashboardContent isSuperAdmin={isSuperAdmin} />
-    </Suspense>
+    <>
+      {/* The header's page title is a <p>, so the page carries its own h1. */}
+      <h1 className="sr-only">Dashboard</h1>
+      <Suspense fallback={<DashboardSkeleton cards={isSuperAdmin ? 5 : 4} />}>
+        <DashboardContent isSuperAdmin={isSuperAdmin} />
+      </Suspense>
+    </>
   )
 }
 

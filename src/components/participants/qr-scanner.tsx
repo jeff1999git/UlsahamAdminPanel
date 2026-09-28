@@ -1,16 +1,21 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import { CheckCircle, AlertCircle, Info, Loader2, RefreshCw, Minus, Plus, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { scanAttendanceAction, confirmEntryAction } from "@/actions/participant.actions"
+import { GATE_SCANNER_PROPS, selfHostZXingWasm } from "@/lib/gate-scanner"
 import { cn } from "@/lib/utils"
 import type { ScanEntryData } from "@/actions/participant.actions"
 
 const Scanner = dynamic(
-  () => import("@yudiel/react-qr-scanner").then((m) => m.Scanner),
+  () =>
+    import("@yudiel/react-qr-scanner").then((m) => {
+      selfHostZXingWasm(m)
+      return m.Scanner
+    }),
   {
     ssr: false,
     loading: () => (
@@ -39,7 +44,30 @@ export function QRScanner({ eventId }: QRScannerProps) {
   const [lastCode, setLastCode] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
+  // At most one pending reset. Each result replaces the previous timer, and a
+  // new code clears it, so an older scan's timer can no longer wipe a newer
+  // result or group-count prompt. Nothing is scheduled while a prompt is open.
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function clearResetTimer() {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
+    resetTimerRef.current = null
+  }
+
+  function scheduleReset() {
+    clearResetTimer()
+    resetTimerRef.current = setTimeout(resetAll, 4000)
+  }
+
+  useEffect(() => {
+    const timer = resetTimerRef
+    return () => {
+      if (timer.current) clearTimeout(timer.current)
+    }
+  }, [])
+
   function resetAll() {
+    clearResetTimer()
     setResult(null)
     setPending(null)
     setEntryCount(1)
@@ -51,6 +79,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
       const ticketCode = results[0]?.rawValue
       if (!ticketCode || ticketCode === lastCode || scanning || pending) return
 
+      clearResetTimer()
       setLastCode(ticketCode)
       setScanning(true)
       setResult(null)
@@ -60,7 +89,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
 
         if (!res.success) {
           setResult({ type: "error", message: res.error })
-          setTimeout(resetAll, 4000)
+          scheduleReset()
           return
         }
 
@@ -68,7 +97,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
 
         if (data.fullyEntered) {
           setResult({ type: "already", name: data.name })
-          setTimeout(resetAll, 4000)
+          scheduleReset()
           return
         }
 
@@ -89,11 +118,11 @@ export function QRScanner({ eventId }: QRScannerProps) {
           } else {
             setResult({ type: "error", message: confirm.error })
           }
-          setTimeout(resetAll, 4000)
+          scheduleReset()
         }
       } catch {
         setResult({ type: "error", message: "Failed to process scan. Try again." })
-        setTimeout(resetAll, 4000)
+        scheduleReset()
       } finally {
         setScanning(false)
       }
@@ -114,16 +143,16 @@ export function QRScanner({ eventId }: QRScannerProps) {
           numberOfParticipants: res.data.numberOfParticipants,
         })
         setPending(null)
-        setTimeout(resetAll, 4000)
+        scheduleReset()
       } else {
         setResult({ type: "error", message: res.error })
         setPending(null)
-        setTimeout(resetAll, 4000)
+        scheduleReset()
       }
     } catch {
       setResult({ type: "error", message: "Failed to confirm entry." })
       setPending(null)
-      setTimeout(resetAll, 4000)
+      scheduleReset()
     } finally {
       setConfirming(false)
     }
@@ -145,6 +174,7 @@ export function QRScanner({ eventId }: QRScannerProps) {
           </div>
         ) : (
           <Scanner
+            {...GATE_SCANNER_PROPS}
             onScan={handleScan}
             onError={(error) => {
               const msg = typeof error === "string" ? error : (error as { message?: string }).message ?? "Camera error"
