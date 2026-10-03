@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { Toaster } from "@/components/ui/sonner"
 import { APP_NAME, APP_DESCRIPTION } from "@/constants"
 
 const inter = Inter({
@@ -24,7 +23,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground">
         {children}
-        <Toaster />
       </body>
     </html>
   )

@@ -1,0 +1,225 @@
+{
+  "description": "Golden fee table for an online booking. The admin API (src/lib/pricing.ts, used by the payment order routes) and the customer site must both reproduce every row. Amounts are rupees; totalPaise is what the Razorpay order is created for.",
+  "rules": [
+    "effectiveAmount: null when isFree; else earlyBirdAmount when isEarlyBird and earlyBirdAmount is not null; else amount (null when the event has no price).",
+    "A null effectiveAmount is never charged: the booking routes refuse to create an order.",
+    "base: effectiveAmount x quantity for a ticket. For a competition the first member pays effectiveAmount and each further member pays groupExtraAmount, or effectiveAmount again when groupExtraAmount is null.",
+    "couponDiscount is a flat amount off the whole order (not per person). discount = min(couponDiscount, base); discountedBase = max(0, base - discount).",
+    "gst = gstEnabled ? round2(discountedBase x gstRate) : 0. platformFee = platformFeeEnabled ? round2(discountedBase x platformFeeRate) : 0. round2(x) = Math.round(x x 100) / 100.",
+    "total = round2(discountedBase + gst + platformFee); totalPaise = Math.round(total x 100).",
+    "Compare rupee fields to the paisa (|difference| < 0.005) and totalPaise exactly."
+  ],
+  "rates": { "gst": 0.18, "platformFee": 0.02 },
+  "cases": [
+    {
+      "id": "ticket-x1-gst-and-fee",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 500, "discount": 0, "discountedBase": 500, "gst": 90, "platformFee": 10, "total": 600, "totalPaise": 60000 }
+    },
+    {
+      "id": "ticket-x2-gst-and-fee",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 1000, "discount": 0, "discountedBase": 1000, "gst": 180, "platformFee": 20, "total": 1200, "totalPaise": 120000 }
+    },
+    {
+      "id": "ticket-x3-no-gst-no-fee",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": false, "platformFeeEnabled": false, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 3,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 1500, "discount": 0, "discountedBase": 1500, "gst": 0, "platformFee": 0, "total": 1500, "totalPaise": 150000 }
+    },
+    {
+      "id": "ticket-x2-gst-only",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": false, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 1000, "discount": 0, "discountedBase": 1000, "gst": 180, "platformFee": 0, "total": 1180, "totalPaise": 118000 }
+    },
+    {
+      "id": "ticket-x2-fee-only",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": false, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 1000, "discount": 0, "discountedBase": 1000, "gst": 0, "platformFee": 20, "total": 1020, "totalPaise": 102000 }
+    },
+    {
+      "id": "early-bird-on-x2",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": true, "earlyBirdAmount": 400, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 400, "base": 800, "discount": 0, "discountedBase": 800, "gst": 144, "platformFee": 16, "total": 960, "totalPaise": 96000 }
+    },
+    {
+      "id": "early-bird-price-set-but-off",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": 400, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 1000, "discount": 0, "discountedBase": 1000, "gst": 180, "platformFee": 20, "total": 1200, "totalPaise": 120000 }
+    },
+    {
+      "id": "early-bird-on-without-early-bird-price",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": true, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 500, "discount": 0, "discountedBase": 500, "gst": 90, "platformFee": 10, "total": 600, "totalPaise": 60000 }
+    },
+    {
+      "id": "early-bird-on-x3-no-gst-no-fee",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": true, "earlyBirdAmount": 400, "gstEnabled": false, "platformFeeEnabled": false, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 3,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 400, "base": 1200, "discount": 0, "discountedBase": 1200, "gst": 0, "platformFee": 0, "total": 1200, "totalPaise": 120000 }
+    },
+    {
+      "id": "coupon-below-base",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 100,
+      "expected": { "effectiveAmount": 500, "base": 1000, "discount": 100, "discountedBase": 900, "gst": 162, "platformFee": 18, "total": 1080, "totalPaise": 108000 }
+    },
+    {
+      "id": "coupon-equals-base",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 500,
+      "expected": { "effectiveAmount": 500, "base": 500, "discount": 500, "discountedBase": 0, "gst": 0, "platformFee": 0, "total": 0, "totalPaise": 0 }
+    },
+    {
+      "id": "coupon-above-base",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 800,
+      "expected": { "effectiveAmount": 500, "base": 500, "discount": 500, "discountedBase": 0, "gst": 0, "platformFee": 0, "total": 0, "totalPaise": 0 }
+    },
+    {
+      "id": "coupon-is-per-order-not-per-person",
+      "event": { "isFree": false, "amount": 300, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 3,
+      "couponDiscount": 200,
+      "expected": { "effectiveAmount": 300, "base": 900, "discount": 200, "discountedBase": 700, "gst": 126, "platformFee": 14, "total": 840, "totalPaise": 84000 }
+    },
+    {
+      "id": "early-bird-with-coupon-gst-only",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": true, "earlyBirdAmount": 400, "gstEnabled": true, "platformFeeEnabled": false, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 150,
+      "expected": { "effectiveAmount": 400, "base": 800, "discount": 150, "discountedBase": 650, "gst": 117, "platformFee": 0, "total": 767, "totalPaise": 76700 }
+    },
+    {
+      "id": "rounding-333.33-x1",
+      "event": { "isFree": false, "amount": 333.33, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 333.33, "base": 333.33, "discount": 0, "discountedBase": 333.33, "gst": 60, "platformFee": 6.67, "total": 400, "totalPaise": 40000 }
+    },
+    {
+      "id": "rounding-333.33-x3",
+      "event": { "isFree": false, "amount": 333.33, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 3,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 333.33, "base": 999.99, "discount": 0, "discountedBase": 999.99, "gst": 180, "platformFee": 20, "total": 1199.99, "totalPaise": 119999 }
+    },
+    {
+      "id": "rounding-333.33-x2-coupon-50",
+      "event": { "isFree": false, "amount": 333.33, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 50,
+      "expected": { "effectiveAmount": 333.33, "base": 666.66, "discount": 50, "discountedBase": 616.66, "gst": 111, "platformFee": 12.33, "total": 739.99, "totalPaise": 73999 }
+    },
+    {
+      "id": "rounding-99.99-gst-only",
+      "event": { "isFree": false, "amount": 99.99, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": false, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 99.99, "base": 99.99, "discount": 0, "discountedBase": 99.99, "gst": 18, "platformFee": 0, "total": 117.99, "totalPaise": 11799 }
+    },
+    {
+      "id": "rounding-199-x1",
+      "event": { "isFree": false, "amount": 199, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 199, "base": 199, "discount": 0, "discountedBase": 199, "gst": 35.82, "platformFee": 3.98, "total": 238.8, "totalPaise": 23880 }
+    },
+    {
+      "id": "ticket-x10-fractional-price",
+      "event": { "isFree": false, "amount": 249.5, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 10,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 249.5, "base": 2495, "discount": 0, "discountedBase": 2495, "gst": 449.1, "platformFee": 49.9, "total": 2994, "totalPaise": 299400 }
+    },
+    {
+      "id": "competition-group-of-3-extra-200",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": 200 },
+      "quantity": 3,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 900, "discount": 0, "discountedBase": 900, "gst": 162, "platformFee": 18, "total": 1080, "totalPaise": 108000 }
+    },
+    {
+      "id": "competition-group-of-3-extra-null",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": null },
+      "quantity": 3,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 1500, "discount": 0, "discountedBase": 1500, "gst": 270, "platformFee": 30, "total": 1800, "totalPaise": 180000 }
+    },
+    {
+      "id": "competition-individual-entry-ignores-extra",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": 200 },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 500, "discount": 0, "discountedBase": 500, "gst": 90, "platformFee": 10, "total": 600, "totalPaise": 60000 }
+    },
+    {
+      "id": "competition-extra-zero-is-not-null",
+      "event": { "isFree": false, "amount": 500, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": 0 },
+      "quantity": 4,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 500, "base": 500, "discount": 0, "discountedBase": 500, "gst": 90, "platformFee": 10, "total": 600, "totalPaise": 60000 }
+    },
+    {
+      "id": "competition-early-bird-group-coupon",
+      "event": { "isFree": false, "amount": 600, "isEarlyBird": true, "earlyBirdAmount": 450, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": 150 },
+      "quantity": 3,
+      "couponDiscount": 100,
+      "expected": { "effectiveAmount": 450, "base": 750, "discount": 100, "discountedBase": 650, "gst": 117, "platformFee": 13, "total": 780, "totalPaise": 78000 }
+    },
+    {
+      "id": "competition-group-of-5-fee-only",
+      "event": { "isFree": false, "amount": 1000, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": false, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": 250 },
+      "quantity": 5,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": 1000, "base": 2000, "discount": 0, "discountedBase": 2000, "gst": 0, "platformFee": 40, "total": 2040, "totalPaise": 204000 }
+    },
+    {
+      "id": "competition-coupon-above-base",
+      "event": { "isFree": false, "amount": 300, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": true, "groupExtraAmount": 100 },
+      "quantity": 2,
+      "couponDiscount": 1000,
+      "expected": { "effectiveAmount": 300, "base": 400, "discount": 400, "discountedBase": 0, "gst": 0, "platformFee": 0, "total": 0, "totalPaise": 0 }
+    },
+    {
+      "id": "free-event",
+      "event": { "isFree": true, "amount": null, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": false, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 2,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": null }
+    },
+    {
+      "id": "free-event-with-stale-prices",
+      "event": { "isFree": true, "amount": 500, "isEarlyBird": true, "earlyBirdAmount": 400, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": null }
+    },
+    {
+      "id": "paid-event-without-a-price",
+      "event": { "isFree": false, "amount": null, "isEarlyBird": false, "earlyBirdAmount": null, "gstEnabled": true, "platformFeeEnabled": true, "isCompetition": false, "groupExtraAmount": null },
+      "quantity": 1,
+      "couponDiscount": 0,
+      "expected": { "effectiveAmount": null }
+    }
+  ]
+}

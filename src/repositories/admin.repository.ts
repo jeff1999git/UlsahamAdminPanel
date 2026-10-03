@@ -24,6 +24,10 @@ export async function findAdminByUsername(username: string) {
   return prisma.admin.findUnique({ where: { username } })
 }
 
+export async function findAdminRoleByUsername(username: string) {
+  return prisma.admin.findUnique({ where: { username }, select: { role: true } })
+}
+
 export async function createAdminAccount(data: {
   username: string
   passwordHash: string

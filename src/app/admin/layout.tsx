@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { Sidebar, MobileNav } from "@/components/admin/sidebar"
 import { Header } from "@/components/admin/header"
+import { Toaster } from "@/components/ui/sonner"
 import type { AdminRole } from "@prisma/client"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </div>
 
       <MobileNav role={role} />
+      {/* Only admin pages raise toasts; here it stays out of the login page's JS. */}
+      <Toaster />
     </div>
   )
 }
