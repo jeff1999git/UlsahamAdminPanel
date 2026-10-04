@@ -44,7 +44,7 @@ function formatTimeForInput(time: string): string {
   if (!time) return ""
   const match = time.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i)
   if (!match) return ""
-  let [, hours, minutes, meridiem] = match
+  const [, hours, minutes, meridiem] = match
   let h = parseInt(hours)
   if (meridiem.toUpperCase() === "PM" && h < 12) h += 12
   if (meridiem.toUpperCase() === "AM" && h === 12) h = 0

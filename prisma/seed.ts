@@ -3,20 +3,19 @@ config({ path: ".env.local" })
 
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import { describeEnvErrors, seedEnvSchema } from "../src/lib/env-schema"
 
 const prisma = new PrismaClient()
 
 async function main() {
   console.log("🌱 Starting database seed...")
 
-  const superAdminUsername = process.env.SUPER_ADMIN_USERNAME
-  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD
-
-  if (!superAdminUsername || !superAdminPassword) {
-    throw new Error(
-      "Missing required environment variables: SUPER_ADMIN_USERNAME, SUPER_ADMIN_PASSWORD"
-    )
+  const parsedEnv = seedEnvSchema.safeParse(process.env)
+  if (!parsedEnv.success) {
+    throw new Error(`Seed environment validation failed:\n${describeEnvErrors(parsedEnv.error)}`)
   }
+  const { SUPER_ADMIN_USERNAME: superAdminUsername, SUPER_ADMIN_PASSWORD: superAdminPassword } =
+    parsedEnv.data
 
   const BCRYPT_ROUNDS = 12
 

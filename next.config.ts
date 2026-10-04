@@ -46,8 +46,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // Lint runs as its own step (npm run lint), so a lint warning or a new rule
+  // never blocks a deploy. Type errors still fail the build (above).
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   async headers() {
     return [
