@@ -4,10 +4,12 @@ import { ArrowLeft } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { findEventById } from "@/repositories/event.repository"
 import { getParticipantRowsForEvent } from "@/repositories/participant.repository"
+import { findTicketContactSettings } from "@/repositories/settings.repository"
 import { ParticipantTable } from "@/components/participants/participant-table"
 import { AddParticipantDialog } from "@/components/participants/add-participant-dialog"
 import { ImportParticipantsDialog } from "@/components/participants/import-participants-dialog"
 import { entryStatusOf } from "@/lib/entry-type"
+import { ticketContacts } from "@/lib/ticket-contacts"
 import { formatDate } from "@/lib/utils"
 import type { ParticipantRow } from "@/types/participant.types"
 import type { Metadata } from "next"
@@ -29,9 +31,11 @@ export default async function ParticipantsPage({ params }: Props) {
 
   const { id } = await params
 
-  const [event, bookings] = await Promise.all([
+  // Settings supply the contact lines printed on tickets and cards.
+  const [event, bookings, contactSettings] = await Promise.all([
     findEventById(id),
     getParticipantRowsForEvent(id),
+    findTicketContactSettings(),
   ])
 
   if (!event) {
@@ -83,6 +87,7 @@ export default async function ParticipantsPage({ params }: Props) {
         eventBannerUrl={event.bannerImageUrl}
         competitionInstructions={event.competitionInstructions}
         competitionNotes={event.competitionNotes}
+        ticketContacts={ticketContacts(contactSettings)}
         isSuperAdmin={role === "SUPER_ADMIN"}
       />
     </div>

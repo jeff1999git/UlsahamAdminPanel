@@ -3,9 +3,10 @@
 import crypto from "crypto"
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import { getRazorpay, fetchOrderBooking, type OrderBooking } from "@/lib/razorpay"
+import { getRazorpay, fetchOrderBooking, safeHexEqual, type OrderBooking } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
+import { getBookingClosedReason, getBookingClosedMessage } from "@/lib/event-status"
 import { findEventById } from "@/repositories/event.repository"
 import { countParticipantsForEvent } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
@@ -46,7 +47,11 @@ export async function createPaymentOrderAction(
   try {
     const event = await findEventById(eventId)
     if (!event) return { success: false, error: "Event not found" }
-    if (event.status !== "PUBLISHED") return { success: false, error: "Event is not accepting registrations" }
+    // By the clock as well as the stored status, as the site's order route
+    // decides: an event past its end time takes no money, even before the
+    // sweep marks it Completed. Seats are counted below.
+    const closedReason = getBookingClosedReason(event)
+    if (closedReason) return { success: false, error: getBookingClosedMessage(closedReason) ?? "Event is not accepting registrations" }
     if (event.isFree || !event.amount) return { success: false, error: "This is a free event" }
 
     // Each enrollment is its own booking — a phone number may hold several.
@@ -116,7 +121,7 @@ export async function verifyAndEnrollAction(
   // HMAC-SHA256 signature verification — protects against tampered callbacks
   const body = `${paymentData.razorpay_order_id}|${paymentData.razorpay_payment_id}`
   const expected = crypto.createHmac("sha256", secret).update(body).digest("hex")
-  if (expected !== paymentData.razorpay_signature) {
+  if (!safeHexEqual(expected, paymentData.razorpay_signature)) {
     return { success: false, error: "Payment verification failed. Please contact support." }
   }
 
@@ -152,6 +157,7 @@ export async function verifyAndEnrollAction(
       entryType: "PAID",
       paymentOrderId: paymentData.razorpay_order_id,
       paymentId: paymentData.razorpay_payment_id,
+      amountPaidPaise: booking.amountPaise,
     })
 
     if (!isNew) {

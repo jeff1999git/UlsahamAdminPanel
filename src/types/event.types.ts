@@ -142,7 +142,10 @@ export type CreateEventInput = {
   galleryImages?: EventImage[]
 }
 
-export type UpdateEventInput = Partial<CreateEventInput>
+export type UpdateEventInput = Partial<Omit<CreateEventInput, "complimentaryCodes">> & {
+  /** No usedCount: an update keeps each code's count from the database. */
+  complimentaryCodes?: Pick<ComplimentaryCode, "code" | "maxUses">[]
+}
 
 export type EventListParams = {
   page?: number

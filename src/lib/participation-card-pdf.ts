@@ -1,3 +1,5 @@
+import { DEFAULT_TICKET_CONTACTS, type TicketContacts } from "@/lib/ticket-contacts"
+
 const GREEN = "#014421"
 
 export type ParticipationCardData = {
@@ -10,6 +12,8 @@ export type ParticipationCardData = {
   ticketCode: string
   instructions?: string | null
   notes?: string | null
+  /** The footer's contact line; Settings' phone and Instagram. */
+  contacts?: TicketContacts
 }
 
 /**
@@ -133,7 +137,8 @@ export async function downloadParticipationCardPdf(data: ParticipationCardData, 
   doc.setFont("helvetica", "normal")
   doc.setFontSize(9)
   doc.setTextColor("#777777")
-  doc.text("Contact: 9446266011  ·  Instagram: @ulsaham_", pageW / 2, pageH - 10, { align: "center" })
+  const contacts = data.contacts ?? DEFAULT_TICKET_CONTACTS
+  doc.text(`Contact: ${contacts.phone}  ·  Instagram: ${contacts.instagram}`, pageW / 2, pageH - 10, { align: "center" })
 
   doc.save(filename)
 }

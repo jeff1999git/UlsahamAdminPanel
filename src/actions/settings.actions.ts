@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { logActivity } from "@/lib/activity-logger"
 import { upsertSettings, addBrandPartner, removeBrandPartner } from "@/repositories/settings.repository"
-import { deleteImage } from "@/lib/cloudinary"
+import { scheduleImageDeletes } from "@/services/housekeeping.service"
 import { settingsSchema } from "@/validators/settings.validator"
 import type { ActionResult } from "@/types"
 import type { Settings, BrandPartner } from "@prisma/client"
@@ -84,25 +84,27 @@ export async function addBrandPartnerAction(partner: {
   }
 }
 
-export async function removeBrandPartnerAction(
-  partnerId: string,
-  logoId: string
-): Promise<ActionResult<void>> {
+export async function removeBrandPartnerAction(partnerId: string): Promise<ActionResult<void>> {
   const session = await getSession()
   if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
   try {
-    await removeBrandPartner(partnerId)
-    await deleteImage(logoId)
+    // The logo deleted is the one stored with the partner, never an id the
+    // browser names. A partner already removed (another tab) is a success.
+    const removed = await removeBrandPartner(partnerId)
+    if (removed) {
+      // Deleted later, once the website's cached partner list has moved on.
+      await scheduleImageDeletes([removed.logoId])
 
-    await logActivity({
-      adminUsername: session.username,
-      adminRole: session.role,
-      action: "SETTINGS_UPDATED",
-      entity: "Settings",
-      description: "Removed brand partner",
-      metadata: { partnerId },
-    })
+      await logActivity({
+        adminUsername: session.username,
+        adminRole: session.role,
+        action: "SETTINGS_UPDATED",
+        entity: "Settings",
+        description: `Removed brand partner: ${removed.name}`,
+        metadata: { partnerId },
+      })
+    }
 
     revalidatePath("/admin/settings")
     return { success: true, data: undefined }

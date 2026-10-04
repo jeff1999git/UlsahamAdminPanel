@@ -60,6 +60,7 @@ import {
 } from "@/actions/participant.actions"
 import { formatDate, formatDateTime, isChunkLoadError } from "@/lib/utils"
 import { entryStatusOf, ENTRY_STATUS_LABELS, type EntryStatus } from "@/lib/entry-type"
+import type { TicketContacts } from "@/lib/ticket-contacts"
 import { ACTION_FAILED_MESSAGE } from "@/constants"
 import type { ParticipantRow } from "@/types/participant.types"
 
@@ -433,6 +434,8 @@ interface ParticipantTableProps {
   eventBannerUrl?: string | null
   competitionInstructions?: string | null
   competitionNotes?: string | null
+  /** The contact lines tickets and participation cards print. */
+  ticketContacts?: TicketContacts
   isSuperAdmin: boolean
 }
 
@@ -447,6 +450,7 @@ export function ParticipantTable({
   eventBannerUrl,
   competitionInstructions,
   competitionNotes,
+  ticketContacts,
   isSuperAdmin,
 }: ParticipantTableProps) {
   const [isPending, startTransition] = useTransition()
@@ -699,6 +703,7 @@ export function ParticipantTable({
           competitionInstructions={competitionInstructions}
           competitionNotes={competitionNotes}
           bannerImageUrl={eventBannerUrl}
+          contacts={ticketContacts}
         />
       )}
 
@@ -809,6 +814,7 @@ export function ParticipantTable({
                     competitionInstructions={competitionInstructions}
                     competitionNotes={competitionNotes}
                     bannerImageUrl={eventBannerUrl}
+                    contacts={ticketContacts}
                     fullWidth
                   />
                 ) : (

@@ -62,6 +62,17 @@ describe("runtime env", () => {
     await loadEnv()
     expect(warn).not.toHaveBeenCalled()
   })
+
+  it("SITE_URL is optional: unset or empty means the live site, and a value must be a URL", () => {
+    delete process.env.SITE_URL
+    expect(runtimeEnvSchema.parse(process.env).SITE_URL).toBe("https://www.ulsaaham.com")
+    process.env.SITE_URL = ""
+    expect(runtimeEnvSchema.parse(process.env).SITE_URL).toBe("https://www.ulsaaham.com")
+    process.env.SITE_URL = "https://preview.example"
+    expect(runtimeEnvSchema.parse(process.env).SITE_URL).toBe("https://preview.example")
+    process.env.SITE_URL = "www.ulsaaham.com"
+    expect(runtimeEnvSchema.safeParse(process.env).success).toBe(false)
+  })
 })
 
 describe("seed env", () => {
@@ -89,6 +100,8 @@ describe("the secrets are still enforced where they are used", () => {
   }
 
   it("getClientIP trusts the relayed visitor IP only with the shared secret", async () => {
+    // An untrusted relay is logged once per instance (test/booking-routes.test.ts).
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
     // The real module (test/setup.ts mocks the limiters), reloaded with env.
     type RateLimitModule = typeof import("@/lib/ratelimit")
     vi.resetModules()
@@ -101,6 +114,7 @@ describe("the secrets are still enforced where they are used", () => {
     ;({ getClientIP } = await vi.importActual<RateLimitModule>("@/lib/ratelimit"))
     expect(getClientIP(proxiedRequest(""))).toBe("10.0.0.1")
     expect(getClientIP(proxiedRequest("test-proxy-secret"))).toBe("10.0.0.1")
+    consoleError.mockRestore()
   })
 
   it("the Razorpay webhook answers 500 without its secret", async () => {

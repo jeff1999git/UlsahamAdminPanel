@@ -19,12 +19,23 @@ const redis = new Redis({
 const READ_TIMEOUT_MS = 2000
 const WRITE_TIMEOUT_MS = 3000
 
+// Bookings (free or complimentary registrations and payment orders) are
+// limited per visitor IP and phone, ten an hour, with a per-IP ceiling of
+// sixty an hour; see allowBooking.
 export const registerRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  limiter: Ratelimit.slidingWindow(10, "1 h"),
   analytics: false,
   timeout: WRITE_TIMEOUT_MS,
   prefix: "ulsaham:register",
+})
+
+export const registerIpRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, "1 h"),
+  analytics: false,
+  timeout: WRITE_TIMEOUT_MS,
+  prefix: "ulsaham:register-ip",
 })
 
 export const eventsListRateLimit = new Ratelimit({
@@ -53,10 +64,37 @@ export const checkTicketRateLimit = new Ratelimit({
 
 export const paymentOrderRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  limiter: Ratelimit.slidingWindow(10, "1 h"),
   analytics: false,
   timeout: WRITE_TIMEOUT_MS,
   prefix: "ulsaham:payment-order",
+})
+
+export const paymentOrderIpRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, "1 h"),
+  analytics: false,
+  timeout: WRITE_TIMEOUT_MS,
+  prefix: "ulsaham:payment-order-ip",
+})
+
+// The site retries a confirmation a few times, so a buyer stays far below this.
+export const verifyRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "1 m"),
+  analytics: false,
+  timeout: WRITE_TIMEOUT_MS,
+  prefix: "ulsaham:payment-verify",
+})
+
+// The site polls every few seconds for about a minute after a lost payment
+// reply, which stays under this.
+export const paymentStatusRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, "1 m"),
+  analytics: false,
+  timeout: READ_TIMEOUT_MS,
+  prefix: "ulsaham:payment-status",
 })
 
 export const myTicketsRateLimit = new Ratelimit({
@@ -106,6 +144,26 @@ export async function allow(limiter: Ratelimit, id: string): Promise<boolean> {
 }
 
 /**
+ * Whether a booking attempt may go ahead. Keyed on the visitor's IP and the
+ * booking's phone, so buyers sharing one address (a carrier's NAT, a college
+ * network) do not use up each other's attempts, plus a looser per-IP ceiling
+ * so one address cannot cycle through phone numbers. Callers check it after
+ * validating the body, so a malformed request costs nothing. Both buckets are
+ * asked at once, and each fails open as allow() does.
+ */
+export async function allowBooking(
+  limiters: { perPhone: Ratelimit; perIp: Ratelimit },
+  ip: string,
+  phone: string
+): Promise<boolean> {
+  const [phoneAllowed, ipAllowed] = await Promise.all([
+    allow(limiters.perPhone, `${ip}:${phone}`),
+    allow(limiters.perIp, ip),
+  ])
+  return phoneAllowed && ipAllowed
+}
+
+/**
  * Runs `job` at most once per `seconds` across all instances, claimed with an
  * Upstash key set NX with an expiry. For housekeeping started from page views.
  * When Upstash cannot be reached the job runs anyway, as it did before the
@@ -136,6 +194,11 @@ function isTrustedProxy(request: Request): boolean {
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
+// Next can load this module more than once per server, so a global keeps the
+// log below to one line per instance.
+const UNTRUSTED_RELAY_LOGGED = Symbol.for("ulsaham.ratelimit.untrustedRelayLogged")
+const relayFlags = globalThis as { [UNTRUSTED_RELAY_LOGGED]?: boolean }
+
 /**
  * IP used for rate limiting. Requests relayed by the customer site's own
  * server-side proxy arrive from the proxy's egress address, and Vercel
@@ -147,6 +210,12 @@ export function getClientIP(request: Request): string {
   if (isTrustedProxy(request)) {
     const relayed = request.headers.get("x-client-ip")?.trim()
     if (relayed) return relayed
+  } else if (request.headers.has("x-client-ip") && !relayFlags[UNTRUSTED_RELAY_LOGGED]) {
+    relayFlags[UNTRUSTED_RELAY_LOGGED] = true
+    console.error(
+      "[ratelimit] A request relayed a visitor IP (x-client-ip) without a valid x-proxy-key, so it was ignored. " +
+        "If the customer site sent it, PROXY_SHARED_SECRET differs between the two projects and every site visitor shares one rate-limit bucket."
+    )
   }
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??

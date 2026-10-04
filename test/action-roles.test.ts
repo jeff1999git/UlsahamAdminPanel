@@ -22,6 +22,9 @@ const m = vi.hoisted(() => {
     name: "Test Event",
     slug: "test-event",
     status: "PUBLISHED",
+    date: new Date("2099-01-01T00:00:00.000Z"),
+    startTime: "06:00 PM",
+    endTime: "09:00 PM",
     isFree: false,
     amount: 500,
     isEarlyBird: false,
@@ -55,7 +58,8 @@ const m = vi.hoisted(() => {
     }),
     // lib
     logActivity: vi.fn(async () => undefined),
-    deleteImage: vi.fn(async () => undefined),
+    deleteImage: vi.fn(async () => true),
+    scheduleImageDeletes: vi.fn(async () => undefined),
     hash: vi.fn(async () => "hashed-password"),
     ordersCreate: vi.fn(async (order: { amount: number }) => ({ id: "order_1", ...order })),
     fetchOrderBooking: vi.fn(async () => ({
@@ -70,10 +74,13 @@ const m = vi.hoisted(() => {
     // services
     createNewEvent: vi.fn(async () => paidEvent),
     updateExistingEvent: vi.fn(async () => paidEvent),
-    deleteEventWithCleanup: vi.fn(async () => paidEvent),
+    deleteEventWithCleanup: vi.fn(async (): Promise<{ outcome: "deleted" } | { outcome: "cancelled"; bookings: number }> => ({
+      outcome: "deleted",
+    })),
     toggleEventStatus: vi.fn(async () => paidEvent),
     getEventById: vi.fn(async () => paidEvent),
     registerParticipant: vi.fn(async () => ({ participant, isNew: true })),
+    importParticipants: vi.fn(async () => ({ added: 1, skipped: 0, errors: [] })),
     updateExistingParticipant: vi.fn(async () => participant),
     deleteParticipantWithCleanup: vi.fn(async () => participant),
     toggleAttendance: vi.fn(async () => ({ ...participant, attended: true })),
@@ -97,7 +104,12 @@ const m = vi.hoisted(() => {
     deleteAdminAccount: vi.fn(async () => undefined),
     upsertSettings: vi.fn(async () => ({ id: "s1" })),
     addBrandPartner: vi.fn(async () => undefined),
-    removeBrandPartner: vi.fn(async () => undefined),
+    removeBrandPartner: vi.fn(async (): Promise<{ id: string; name: string; logoUrl: string; logoId: string } | null> => ({
+      id: "bp1",
+      name: "Partner",
+      logoUrl: "https://res.cloudinary.com/test-cloud/image/upload/logo.png",
+      logoId: "ulsaham/brand-partners/logo",
+    })),
   }
 })
 
@@ -113,7 +125,11 @@ vi.mock("next-auth", () => ({
 vi.mock("bcryptjs", () => ({ default: { hash: m.hash, compare: vi.fn() } }))
 vi.mock("@/lib/activity-logger", () => ({ logActivity: m.logActivity }))
 vi.mock("@/lib/cloudinary", () => ({ deleteImage: m.deleteImage }))
-vi.mock("@/lib/razorpay", () => ({
+vi.mock("@/services/housekeeping.service", () => ({ scheduleImageDeletes: m.scheduleImageDeletes }))
+// safeHexEqual and the other helpers stay real; the two calls that would
+// reach Razorpay are replaced.
+vi.mock("@/lib/razorpay", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/razorpay")>()),
   getRazorpay: () => ({ orders: { create: m.ordersCreate } }),
   fetchOrderBooking: m.fetchOrderBooking,
 }))
@@ -126,6 +142,7 @@ vi.mock("@/services/event.service", () => ({
 }))
 vi.mock("@/services/participant.service", () => ({
   registerParticipant: m.registerParticipant,
+  importParticipants: m.importParticipants,
   updateExistingParticipant: m.updateExistingParticipant,
   deleteParticipantWithCleanup: m.deleteParticipantWithCleanup,
   toggleAttendance: m.toggleAttendance,
@@ -332,7 +349,7 @@ const MATRIX: Record<string, { module: Record<string, unknown>; rows: Record<str
           participantActions.bulkAddParticipantsAction("evt1", [
             { row: 2, name: "Imported Person", phone: "9876500000", email: "", age: 25, numberOfParticipants: 1 },
           ]),
-        reaches: m.registerParticipant,
+        reaches: m.importParticipants,
       },
       exportParticipantsAction: {
         access: STAFF,
@@ -377,7 +394,7 @@ const MATRIX: Record<string, { module: Record<string, unknown>; rows: Record<str
       },
       removeBrandPartnerAction: {
         access: SUPER_ADMIN_ONLY,
-        call: () => settingsActions.removeBrandPartnerAction("bp1", "ulsaham/brand-partners/logo"),
+        call: () => settingsActions.removeBrandPartnerAction("bp1"),
         reaches: m.removeBrandPartner,
       },
     },
@@ -415,12 +432,14 @@ const WRITES: Mock[] = [
   m.logActivity,
   m.revalidatePath,
   m.deleteImage,
+  m.scheduleImageDeletes,
   m.ordersCreate,
   m.createNewEvent,
   m.updateExistingEvent,
   m.deleteEventWithCleanup,
   m.toggleEventStatus,
   m.registerParticipant,
+  m.importParticipants,
   m.updateExistingParticipant,
   m.deleteParticipantWithCleanup,
   m.toggleAttendance,
@@ -517,5 +536,65 @@ describe("verifyAndEnrollAction", () => {
     const result = await paymentActions.verifyAndEnrollAction(signedPayment("order_1", "pay_1"), "evt-other", {})
     expect(result).toMatchObject({ success: false })
     expect(m.registerParticipant).not.toHaveBeenCalled()
+  })
+})
+
+describe("deleteEventAction says whether it deleted or cancelled", () => {
+  it("a delete is logged as EVENT_DELETED and goes to the events list", async () => {
+    signInAs("SUPER_ADMIN")
+    await expect(eventActions.deleteEventAction("evt1")).rejects.toThrow("NEXT_REDIRECT /admin/events")
+    expect(m.logActivity).toHaveBeenCalledTimes(1)
+    expect(m.logActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "EVENT_DELETED", entityId: "evt1", description: "Deleted event: Test Event" })
+    )
+  })
+
+  it("an event with bookings is logged as cancelled, with the count, and the result says so", async () => {
+    signInAs("SUPER_ADMIN")
+    m.deleteEventWithCleanup.mockResolvedValueOnce({ outcome: "cancelled", bookings: 3 })
+
+    expect(await eventActions.deleteEventAction("evt1")).toEqual({ success: true, data: { outcome: "cancelled" } })
+    expect(m.redirect).not.toHaveBeenCalled()
+    expect(m.logActivity).toHaveBeenCalledTimes(1)
+    expect(m.logActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "EVENT_STATUS_CHANGED",
+        entityId: "evt1",
+        description: "Cancelled event (3 bookings, so not deleted): Test Event",
+        metadata: { newStatus: "CANCELLED", bookings: 3 },
+      })
+    )
+    // The edit page, which re-renders with this result, shows the new status.
+    expect(m.revalidatePath).toHaveBeenCalledWith("/admin/events/evt1/edit")
+  })
+
+  it("one booking reads in the singular", async () => {
+    signInAs("SUPER_ADMIN")
+    m.deleteEventWithCleanup.mockResolvedValueOnce({ outcome: "cancelled", bookings: 1 })
+    await eventActions.deleteEventAction("evt1")
+    expect(m.logActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "Cancelled event (1 booking, so not deleted): Test Event" })
+    )
+  })
+})
+
+describe("removeBrandPartnerAction", () => {
+  it("queues the logo stored with the partner for deletion; nothing is deleted at once", async () => {
+    signInAs("SUPER_ADMIN")
+    expect(await settingsActions.removeBrandPartnerAction("bp1")).toEqual({ success: true, data: undefined })
+    expect(m.removeBrandPartner).toHaveBeenCalledWith("bp1")
+    expect(m.scheduleImageDeletes).toHaveBeenCalledWith(["ulsaham/brand-partners/logo"])
+    expect(m.deleteImage).not.toHaveBeenCalled()
+    expect(m.logActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "Removed brand partner: Partner", metadata: { partnerId: "bp1" } })
+    )
+  })
+
+  it("a partner already removed (another tab) succeeds with nothing to delete or log", async () => {
+    signInAs("SUPER_ADMIN")
+    m.removeBrandPartner.mockResolvedValueOnce(null)
+    expect(await settingsActions.removeBrandPartnerAction("bp1")).toEqual({ success: true, data: undefined })
+    expect(m.scheduleImageDeletes).not.toHaveBeenCalled()
+    expect(m.logActivity).not.toHaveBeenCalled()
   })
 })

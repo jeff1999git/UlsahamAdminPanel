@@ -3,6 +3,7 @@ import {
   findEventById,
   findEventBySlug,
   findPublishedEventBySlug,
+  findBookableEventBySlug,
   listEventsForAdmin,
   listPublishedEvents,
   autoCompleteExpiredEvents,
@@ -15,11 +16,13 @@ import {
   incrementComplimentaryCodeUsage,
 } from "@/repositories/event.repository"
 import { countParticipantsForEvent, sumParticipantsForEvents } from "@/repositories/participant.repository"
+import { scheduleImageDeletes } from "@/services/housekeeping.service"
 import { generateSlug } from "@/lib/slug"
 import { sanitizeString } from "@/lib/sanitize"
 import { getEffectiveAmount } from "@/lib/pricing"
-import { hasEventEnded } from "@/lib/event-time"
+import { hasEventEnded, toEventDay } from "@/lib/event-time"
 import { noTiming, type ServerTiming } from "@/lib/server-timing"
+import { SLUG_IN_USE_MESSAGE } from "@/constants"
 import {
   getEffectiveStatus,
   getBookingClosedReason,
@@ -34,15 +37,15 @@ import type {
   PublicEvent,
   PublicEventListItem,
 } from "@/types/event.types"
-import type { EventStatus } from "@prisma/client"
+import { Prisma, type EventStatus } from "@prisma/client"
 
 export { COMPLETED_IS_AUTOMATIC }
 
-// Cloudinary (and its lodash) is needed only when an image is replaced or an
-// event deleted, so it is loaded then rather than on every public read.
-async function deleteImage(publicId: string) {
-  const cloudinary = await import("@/lib/cloudinary")
-  return cloudinary.deleteImage(publicId)
+/** True when `error` is the unique slug index (Event_slug_key) refusing a write. */
+function isSlugTaken(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false
+  const target = (error.meta as { target?: unknown } | undefined)?.target
+  return (Array.isArray(target) ? target.join(",") : String(target ?? "")).includes("slug")
 }
 
 // The COMPLETED sweep (autoCompleteExpiredEvents) runs at most once a minute
@@ -123,10 +126,10 @@ export async function getEventById(id: string) {
 }
 
 /**
- * The full bookable event (every column except the coupon and complimentary
- * codes, lastCompetitionNumber and the Cloudinary ids) plus booking state. The
- * booking and payment routes price from this object, so it is never trimmed;
- * the public detail route narrows it with toPublicEvent.
+ * The event detail (every column except the coupon and complimentary codes,
+ * lastCompetitionNumber and the Cloudinary ids) plus booking state and the seat
+ * count. The public detail route narrows it with toPublicEvent; the booking
+ * and payment routes read getBookableEventBySlug instead.
  */
 export async function getPublishedEventBySlug(slug: string, timing: ServerTiming = noTiming) {
   const event = await timing.time("event", () => findPublishedEventBySlug(slug))
@@ -149,6 +152,27 @@ export async function getPublishedEventBySlug(slug: string, timing: ServerTiming
     galleryImageUrls: galleryImages.map((img) => img.url),
   }
 }
+
+/**
+ * The event a booking or payment route works on, in one read: pricing, codes,
+ * capacity, competition rules and status. Ended and cancelled events come back
+ * too, so the routes refuse them with their reason. The closed reason comes
+ * from the status and the clock only; FULL needs a seat count, which a route
+ * takes itself when it is about to add seats.
+ */
+export async function getBookableEventBySlug(slug: string) {
+  const event = await findBookableEventBySlug(slug)
+  if (!event) return null
+  const bookingClosedReason = getBookingClosedReason(event)
+  return {
+    ...event,
+    effectiveAmount: getEffectiveAmount(event),
+    bookingClosedReason,
+    bookingClosedMessage: getBookingClosedMessage(bookingClosedReason),
+  }
+}
+
+export type BookableEvent = NonNullable<Awaited<ReturnType<typeof getBookableEventBySlug>>>
 
 /** The public event detail, as an allow-list: only fields the site reads. */
 export function toPublicEvent(event: PublicEvent): PublicEvent {
@@ -235,7 +259,9 @@ export async function getDashboardStats() {
 }
 
 export async function createNewEvent(input: CreateEventInput) {
-  assertStatusIsSelectable(input.status, input)
+  // Stored as the event's day in IST (see toEventDay).
+  const date = toEventDay(input.date)
+  assertStatusIsSelectable(input.status, { ...input, date })
 
   const baseSlug = input.slug || generateSlug(input.name)
 
@@ -257,8 +283,7 @@ export async function createNewEvent(input: CreateEventInput) {
     slug = `${baseSlug}-${Date.now().toString(36).slice(-5)}`
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createEvent({
+  const data = {
     name: sanitizeString(input.name),
     slug: slug,
     description: sanitizeString(input.description),
@@ -266,7 +291,7 @@ export async function createNewEvent(input: CreateEventInput) {
     bannerImageId: input.bannerImageId,
     venue: sanitizeString(input.venue),
     venueLink: input.venueLink ?? null,
-    date: input.date,
+    date,
     startTime: input.startTime,
     endTime: input.endTime,
     isFree: input.isFree,
@@ -286,18 +311,40 @@ export async function createNewEvent(input: CreateEventInput) {
     couponCodes: { set: input.couponCodes ?? [] },
     complimentaryCodes: { set: input.complimentaryCodes ?? [] },
     galleryImages: { set: input.galleryImages ?? [] },
-  } as Parameters<typeof createEvent>[0])
+  } as Parameters<typeof createEvent>[0]
+
+  // Two creates with the same slug at once: the unique index refuses the
+  // second, which reads as a taken slug rather than Prisma's message.
+  try {
+    return await createEvent(data)
+  } catch (error) {
+    if (isSlugTaken(error)) throw new Error(SLUG_IN_USE_MESSAGE)
+    throw error
+  }
 }
 
 export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   const existing = await findEventById(id)
   if (!existing) throw new Error("Event not found")
 
+  // A changed date is stored as its day in IST (see toEventDay). One the form
+  // sends back unchanged is left alone: an event saved before dates were
+  // normalised may hold an instant, and its day is the UTC day the form shows.
+  const dateChanged = input.date !== undefined && input.date.getTime() !== new Date(existing.date).getTime()
+  const date = dateChanged ? toEventDay(input.date!) : existing.date
+
   assertStatusIsSelectable(input.status, {
-    date: input.date ?? existing.date,
+    date,
     startTime: input.startTime ?? existing.startTime,
     endTime: input.endTime ?? existing.endTime,
   })
+
+  // The unique index would refuse a taken slug too, but only with Prisma's
+  // message; this says which field to change.
+  if (input.slug !== undefined && input.slug !== existing.slug) {
+    const holder = await findEventBySlug(input.slug)
+    if (holder && holder.id !== id) throw new Error(SLUG_IN_USE_MESSAGE)
+  }
 
   const updateData: Record<string, unknown> = {}
 
@@ -306,14 +353,27 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.description !== undefined) updateData.description = sanitizeString(input.description)
   if (input.venue !== undefined) updateData.venue = sanitizeString(input.venue)
   if (input.venueLink !== undefined) updateData.venueLink = input.venueLink ?? null
-  if (input.date !== undefined) updateData.date = input.date
+  if (dateChanged) updateData.date = date
   if (input.startTime !== undefined) updateData.startTime = input.startTime
   if (input.endTime !== undefined) updateData.endTime = input.endTime
   if (input.status !== undefined) updateData.status = input.status
   if (input.featured !== undefined) updateData.featured = input.featured
   if (input.capacity !== undefined) updateData.capacity = input.capacity ?? null
   if (input.couponCodes !== undefined) updateData.couponCodes = { set: input.couponCodes }
-  if (input.complimentaryCodes !== undefined) updateData.complimentaryCodes = { set: input.complimentaryCodes }
+  if (input.complimentaryCodes !== undefined) {
+    // usedCount is counted by bookings, never taken from the form: the edit
+    // page loads it once, so saving would otherwise put back the count from
+    // when the page opened. Each code keeps the database's count; a new code
+    // starts at 0. Codes match case-insensitively, as at redemption.
+    const used = new Map(existing.complimentaryCodes.map((c) => [c.code.toUpperCase(), c.usedCount]))
+    updateData.complimentaryCodes = {
+      set: input.complimentaryCodes.map((c) => ({
+        code: c.code,
+        maxUses: c.maxUses,
+        usedCount: used.get(c.code.toUpperCase()) ?? 0,
+      })),
+    }
+  }
   if (input.gstEnabled !== undefined) updateData.gstEnabled = input.gstEnabled
   if (input.platformFeeEnabled !== undefined) updateData.platformFeeEnabled = input.platformFeeEnabled
   if (input.earlyBirdAmount !== undefined) updateData.earlyBirdAmount = input.earlyBirdAmount ?? null
@@ -359,12 +419,17 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
     }
   }
 
+  // Images this save lets go of. They are queued for deletion only after the
+  // update succeeds, so a failed save (a taken slug, a database error) never
+  // leaves the event pointing at deleted images.
+  const releasedImageIds: string[] = []
+
   if (
     input.bannerImageUrl !== undefined &&
     input.bannerImageId !== undefined &&
     input.bannerImageId !== existing.bannerImageId
   ) {
-    await deleteImage(existing.bannerImageId)
+    releasedImageIds.push(existing.bannerImageId)
     updateData.bannerImageUrl = input.bannerImageUrl
     updateData.bannerImageId = input.bannerImageId
   }
@@ -372,26 +437,40 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.galleryImages !== undefined) {
     const keptIds = new Set(input.galleryImages.map((img) => img.id))
     const removed = existing.galleryImages.filter((img) => !keptIds.has(img.id))
-    await Promise.all(removed.map((img) => deleteImage(img.id)))
+    releasedImageIds.push(...removed.map((img) => img.id))
     updateData.galleryImages = { set: input.galleryImages }
   }
 
-  return updateEvent(id, updateData)
+  let event: Awaited<ReturnType<typeof updateEvent>>
+  try {
+    event = await updateEvent(id, updateData)
+  } catch (error) {
+    if (isSlugTaken(error)) throw new Error(SLUG_IN_USE_MESSAGE)
+    throw error
+  }
+
+  await scheduleImageDeletes(releasedImageIds)
+  return event
 }
 
-export async function deleteEventWithCleanup(id: string) {
+/** What deleteEventWithCleanup did: an event with bookings is cancelled, not deleted. */
+export type DeleteEventOutcome = { outcome: "deleted" } | { outcome: "cancelled"; bookings: number }
+
+export async function deleteEventWithCleanup(id: string): Promise<DeleteEventOutcome> {
   const event = await findEventById(id)
   if (!event) throw new Error("Event not found")
 
-  const participantCount = event._count.participants
+  const bookings = event._count.participants
 
-  if (participantCount > 0) {
-    return updateEvent(id, { status: "CANCELLED" as EventStatus })
+  if (bookings > 0) {
+    await updateEvent(id, { status: "CANCELLED" as EventStatus })
+    return { outcome: "cancelled", bookings }
   }
 
-  await deleteImage(event.bannerImageId)
-  await Promise.all(event.galleryImages.map((img) => deleteImage(img.id)))
-  return deleteEvent(id)
+  await deleteEvent(id)
+  // Its images go once the website's cached pages no longer show them.
+  await scheduleImageDeletes([event.bannerImageId, ...event.galleryImages.map((img) => img.id)])
+  return { outcome: "deleted" }
 }
 
 export async function toggleEventStatus(id: string, status: EventStatus) {

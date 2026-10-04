@@ -53,6 +53,10 @@ export async function GET(request: NextRequest) {
           registeredAt: participant.registeredAt,
           competitionNumber: participant.competitionNumber,
           isGroupRegistration: participant.isGroupRegistration,
+          // The site's ticket email refuses an unpaid booking and prints the
+          // Payment ID recorded here, never one a visitor sends.
+          amountPaid: participant.amountPaid,
+          paymentId: participant.paymentId ?? null,
         },
       },
       { headers: corsHeaders }

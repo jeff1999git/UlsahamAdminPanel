@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto"
 import Razorpay from "razorpay"
 import { participantSchema } from "@/validators/participant.validator"
 
@@ -16,7 +17,7 @@ export function getRazorpay(): Razorpay {
 }
 
 /** What a Razorpay order was created for, as recorded in its notes. */
-export type OrderBooking =
+export type OrderBooking = (
   | {
       /** A new booking. */
       kind: "new"
@@ -33,26 +34,46 @@ export type OrderBooking =
       eventId: string
       ticketCode: string
     }
+) & {
+  /**
+   * What the order charges, in paise (fees included): the booking's revenue.
+   * Null when the order did not carry a usable amount.
+   */
+  amountPaise: number | null
+}
+
+/** The fields that record what an order charged on the booking it pays for, when the amount is known. */
+export function chargeFields(booking: Pick<OrderBooking, "amountPaise">): { amountPaidPaise?: number } {
+  return booking.amountPaise != null ? { amountPaidPaise: booking.amountPaise } : {}
+}
+
+/** An order amount as Razorpay gives it (a number, or a string of digits) in paise, or null. */
+function orderAmountPaise(amount: unknown): number | null {
+  const paise = typeof amount === "string" && /^\d+$/.test(amount.trim()) ? Number(amount) : amount
+  return typeof paise === "number" && Number.isSafeInteger(paise) && paise > 0 ? paise : null
+}
 
 /**
  * Reads the booking back out of an order's notes. The server writes them when
  * it creates the order, so they — not the browser, and not the payment's own
  * notes, which the payer can set at Checkout — say which event, how many seats
- * and which ticket a payment is for. Returns null when the notes are missing or
- * malformed.
+ * and which ticket a payment is for. `orderAmount` is the order's amount, which
+ * the booking records as what was paid. Returns null when the notes are missing
+ * or malformed.
  */
-export function bookingFromOrderNotes(notes: unknown): OrderBooking | null {
+export function bookingFromOrderNotes(notes: unknown, orderAmount?: unknown): OrderBooking | null {
   // Razorpay returns [] for an order created without notes.
   if (!notes || typeof notes !== "object" || Array.isArray(notes)) return null
   const n = notes as Record<string, unknown>
 
   const eventId = typeof n.eventId === "string" ? n.eventId.trim() : ""
   if (!eventId) return null
+  const amountPaise = orderAmountPaise(orderAmount)
 
   // A re-payment settles a ticket that already holds its buyer and seats, so
   // only the ticket is read; its stored details are not re-validated.
   const ticketCode = typeof n.ticketCode === "string" ? n.ticketCode.trim().toUpperCase() : ""
-  if (ticketCode) return { kind: "repay", eventId, ticketCode }
+  if (ticketCode) return { kind: "repay", eventId, ticketCode, amountPaise }
 
   const parsed = participantSchema.safeParse({
     name: n.name,
@@ -63,23 +84,50 @@ export function bookingFromOrderNotes(notes: unknown): OrderBooking | null {
   })
   if (!parsed.success) return null
 
-  return { kind: "new", eventId, ...parsed.data, email: parsed.data.email || null }
+  return { kind: "new", eventId, ...parsed.data, email: parsed.data.email || null, amountPaise }
 }
 
 // The SDK sets no timeout of its own, so a hung call would hold the request
 // until the platform killed it.
-const ORDER_FETCH_TIMEOUT_MS = 8000
+export const RAZORPAY_TIMEOUT_MS = 8000
 
-/** Fetches an order and reads its booking. Throws when Razorpay cannot be reached in time. */
-export async function fetchOrderBooking(orderId: string): Promise<OrderBooking | null> {
+/** Settles as `work` does, or rejects with `message` once `ms` have passed. */
+export async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("Timed out fetching the Razorpay order")), ORDER_FETCH_TIMEOUT_MS)
+    timer = setTimeout(() => reject(new Error(message)), ms)
   })
   try {
-    const order = await Promise.race([getRazorpay().orders.fetch(orderId), timeout])
-    return bookingFromOrderNotes(order.notes)
+    return await Promise.race([work, timeout])
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * Fetches an order and reads its booking. Throws when Razorpay cannot be
+ * reached within `timeoutMs`; the webhook passes a shorter limit than the
+ * default.
+ */
+export async function fetchOrderBooking(
+  orderId: string,
+  timeoutMs: number = RAZORPAY_TIMEOUT_MS
+): Promise<OrderBooking | null> {
+  const order = await withTimeout(getRazorpay().orders.fetch(orderId), timeoutMs, "Timed out fetching the Razorpay order")
+  return bookingFromOrderNotes(order.notes, order.amount)
+}
+
+const HEX = /^(?:[0-9a-f]{2})+$/i
+
+/**
+ * Compares two hex signatures in constant time. Anything that is not a
+ * non-empty, even-length hex string compares false, so a malformed signature
+ * is an ordinary mismatch instead of the RangeError timingSafeEqual throws on
+ * unequal lengths. Upper and lower case spell the same bytes, so either matches.
+ */
+export function safeHexEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string" || !HEX.test(a) || !HEX.test(b)) return false
+  const left = Buffer.from(a, "hex")
+  const right = Buffer.from(b, "hex")
+  return left.length === right.length && timingSafeEqual(left, right)
 }

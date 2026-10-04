@@ -45,6 +45,15 @@ export type CreateParticipantInput = {
    */
   paymentOrderId?: string | null
   paymentId?: string | null
+  /** What Razorpay charged for a paid booking, in paise (the order amount). */
+  amountPaidPaise?: number | null
+  /**
+   * The site's id for one registration submit (free and complimentary
+   * bookings, which have no order id). Stored with the booking and used to
+   * derive its ticket code, so a duplicate of the same submit gets the first
+   * booking back. Ignored when paymentOrderId is set.
+   */
+  requestId?: string | null
 }
 
 export type UpdateParticipantInput = {

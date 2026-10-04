@@ -1,7 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { unstable_rethrow } from "next/navigation"
+import { unstable_rethrow, useRouter } from "next/navigation"
 import { Eye, EyeOff, Lock, Unlock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,7 @@ function isNavigationError(error: unknown) {
 }
 
 export function EventEditActions({ eventId, status, participantCount }: EventEditActionsProps) {
+  const router = useRouter()
   const [, startTransition] = useTransition()
 
   const canToggle = status !== "CANCELLED" && status !== "COMPLETED"
@@ -59,8 +60,18 @@ export function EventEditActions({ eventId, status, participantCount }: EventEdi
   async function handleDelete() {
     try {
       const result = await deleteEventAction(eventId)
-      // A successful delete redirects to the events list, so only a failure returns.
-      if (result && !result.success) toast.error(result.error)
+      // A delete redirects to the events list, so only a cancel or a failure returns.
+      if (!result) return
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      // The server decides: bookings made since this page loaded still turn a
+      // delete into a cancel.
+      toast.success("Event cancelled", {
+        description: `It has bookings, so it was cancelled instead of deleted. ${WEBSITE_UPDATE_NOTE_EVENTS}`,
+      })
+      router.push("/admin/events")
     } catch (error) {
       if (isNavigationError(error)) {
         // The delete worked, and the router has already applied the events

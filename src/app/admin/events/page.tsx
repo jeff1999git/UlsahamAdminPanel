@@ -9,7 +9,7 @@ import { EventsFilter } from "@/components/events/events-filter"
 import { Pagination } from "@/components/shared/data-table"
 import { TableSkeleton } from "@/components/shared/skeleton-loaders"
 import { getEvents } from "@/services/event.service"
-import { pruneOldEventParticipants } from "@/repositories/participant.repository"
+import { runEventsHousekeeping } from "@/services/housekeeping.service"
 import { runThrottled } from "@/lib/ratelimit"
 import { parsePositiveInt } from "@/lib/query-params"
 import { EVENT_STATUS_LABELS } from "@/constants"
@@ -35,8 +35,9 @@ async function EventsList({ searchParams, isUser, isSuperAdmin }: { searchParams
     ? (statusParam as EventStatus)
     : ""
 
-  // Housekeeping after the page is sent, at most once an hour across instances.
-  after(() => runThrottled("prune-event-participants", 60 * 60, pruneOldEventParticipants))
+  // Housekeeping after the page is sent, at most once an hour across instances:
+  // old bookings are pruned and images no longer used are deleted.
+  after(() => runThrottled("events-housekeeping", 60 * 60, runEventsHousekeeping))
 
   const { events, total, totalPages } = await getEvents({
     page,

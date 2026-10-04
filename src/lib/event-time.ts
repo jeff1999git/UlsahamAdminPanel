@@ -18,6 +18,25 @@ function parseClockTime(time: string | null | undefined): { hours: number; minut
   return { hours, minutes }
 }
 
+/**
+ * The calendar day in India at `at` (now by default), as YYYY-MM-DD: the day
+ * a date input should treat as today, whatever zone the code runs in. IST has
+ * no daylight saving, so a fixed offset is exact.
+ */
+export function istDateString(at: Date = new Date()): string {
+  return new Date(at.getTime() + IST_OFFSET_MINUTES * 60 * 1000).toISOString().slice(0, 10)
+}
+
+/**
+ * An event date as it is stored: UTC midnight of the day in India that `at`
+ * falls on. A day picked in the event form is already UTC midnight of that day
+ * and comes back unchanged; an instant such as "now" becomes its IST day, so
+ * an event saved at 01:00 IST is not dated the day before.
+ */
+export function toEventDay(at: Date | string): Date {
+  return new Date(`${istDateString(new Date(at))}T00:00:00.000Z`)
+}
+
 /** The UTC instant for hh:mm IST on the calendar day held by `date`. */
 function istInstantOn(date: Date | string, hours: number, minutes: number): Date {
   const d = new Date(date)

@@ -55,6 +55,11 @@ model Event {
   complimentaryCodes       ComplimentaryCode[]
   galleryImages            EventImage[]
   archivedParticipantCount Int                 @default(0)
+  // What the event's bookings brought in, in paise, written when they are
+  // pruned two weeks after the event so the dashboard revenue does not drop.
+  // Unset on events pruned before it existed. Long, as one event's total can
+  // pass the 32-bit limit (about ₹2.1 crore).
+  archivedRevenuePaise     Int?                @db.Long
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
   participants             Participant[]
@@ -120,6 +125,14 @@ model Participant {
   // key that lets payment/verify and the webhook safely replay the same order.
   paymentOrderId       String?
   paymentId            String?
+  // The site's id for one free or complimentary registration submit: a retry
+  // with the same id gets this booking back. Looked up together with eventId
+  // (and phone), so it needs no index of its own.
+  requestId            String?
+  // What Razorpay charged for this booking (the order amount, in paise, fees
+  // included). Unset on bookings made before it was recorded and on free or
+  // complimentary ones; the dashboard estimates those it needs.
+  amountPaidPaise      Int?
   attended             Boolean   @default(false)
   attendedAt           DateTime?
   enteredCount         Int       @default(0)
@@ -143,18 +156,29 @@ type BrandPartner {
   logoId  String
 }
 
+// A Cloudinary image an event save, an event delete or a partner removal let
+// go of. It is deleted once deleteAfter has passed, when no cached page can
+// still show it (see src/services/housekeeping.service.ts).
+type PendingImageDelete {
+  publicId    String
+  deleteAfter DateTime
+}
+
 model Settings {
-  id            String         @id @default(auto()) @map("_id") @db.ObjectId
-  companyName   String         @default("Ulsaham Entertainments")
-  address       String?
-  email         String?
-  phone         String?
-  facebook      String?
-  instagram     String?
-  youtube       String?
-  linkedin      String?
-  brandPartners BrandPartner[]
-  updatedAt     DateTime       @updatedAt
+  id                  String               @id @default(auto()) @map("_id") @db.ObjectId
+  companyName         String               @default("Ulsaham Entertainments")
+  address             String?
+  email               String?
+  phone               String?
+  facebook            String?
+  instagram           String?
+  youtube             String?
+  linkedin            String?
+  brandPartners       BrandPartner[]
+  // Missing on settings saved before it existed, which reads as an empty list.
+  // No index, so it needs no `prisma db push`.
+  pendingImageDeletes PendingImageDelete[]
+  updatedAt           DateTime             @updatedAt
 }
 
 model ActivityLog {
