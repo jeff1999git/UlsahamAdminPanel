@@ -3,6 +3,7 @@ import {
   findEventById,
   findEventBySlug,
   findPublishedEventBySlug,
+  findBookableEventBySlug,
   listEventsForAdmin,
   listPublishedEvents,
   autoCompleteExpiredEvents,
@@ -123,10 +124,10 @@ export async function getEventById(id: string) {
 }
 
 /**
- * The full bookable event (every column except the coupon and complimentary
- * codes, lastCompetitionNumber and the Cloudinary ids) plus booking state. The
- * booking and payment routes price from this object, so it is never trimmed;
- * the public detail route narrows it with toPublicEvent.
+ * The event detail (every column except the coupon and complimentary codes,
+ * lastCompetitionNumber and the Cloudinary ids) plus booking state and the seat
+ * count. The public detail route narrows it with toPublicEvent; the booking
+ * and payment routes read getBookableEventBySlug instead.
  */
 export async function getPublishedEventBySlug(slug: string, timing: ServerTiming = noTiming) {
   const event = await timing.time("event", () => findPublishedEventBySlug(slug))
@@ -149,6 +150,27 @@ export async function getPublishedEventBySlug(slug: string, timing: ServerTiming
     galleryImageUrls: galleryImages.map((img) => img.url),
   }
 }
+
+/**
+ * The event a booking or payment route works on, in one read: pricing, codes,
+ * capacity, competition rules and status. Ended and cancelled events come back
+ * too, so the routes refuse them with their reason. The closed reason comes
+ * from the status and the clock only; FULL needs a seat count, which a route
+ * takes itself when it is about to add seats.
+ */
+export async function getBookableEventBySlug(slug: string) {
+  const event = await findBookableEventBySlug(slug)
+  if (!event) return null
+  const bookingClosedReason = getBookingClosedReason(event)
+  return {
+    ...event,
+    effectiveAmount: getEffectiveAmount(event),
+    bookingClosedReason,
+    bookingClosedMessage: getBookingClosedMessage(bookingClosedReason),
+  }
+}
+
+export type BookableEvent = NonNullable<Awaited<ReturnType<typeof getBookableEventBySlug>>>
 
 /** The public event detail, as an allow-list: only fields the site reads. */
 export function toPublicEvent(event: PublicEvent): PublicEvent {
@@ -313,7 +335,20 @@ export async function updateExistingEvent(id: string, input: UpdateEventInput) {
   if (input.featured !== undefined) updateData.featured = input.featured
   if (input.capacity !== undefined) updateData.capacity = input.capacity ?? null
   if (input.couponCodes !== undefined) updateData.couponCodes = { set: input.couponCodes }
-  if (input.complimentaryCodes !== undefined) updateData.complimentaryCodes = { set: input.complimentaryCodes }
+  if (input.complimentaryCodes !== undefined) {
+    // usedCount is counted by bookings, never taken from the form: the edit
+    // page loads it once, so saving would otherwise put back the count from
+    // when the page opened. Each code keeps the database's count; a new code
+    // starts at 0. Codes match case-insensitively, as at redemption.
+    const used = new Map(existing.complimentaryCodes.map((c) => [c.code.toUpperCase(), c.usedCount]))
+    updateData.complimentaryCodes = {
+      set: input.complimentaryCodes.map((c) => ({
+        code: c.code,
+        maxUses: c.maxUses,
+        usedCount: used.get(c.code.toUpperCase()) ?? 0,
+      })),
+    }
+  }
   if (input.gstEnabled !== undefined) updateData.gstEnabled = input.gstEnabled
   if (input.platformFeeEnabled !== undefined) updateData.platformFeeEnabled = input.platformFeeEnabled
   if (input.earlyBirdAmount !== undefined) updateData.earlyBirdAmount = input.earlyBirdAmount ?? null

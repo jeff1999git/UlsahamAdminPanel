@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto"
 import Razorpay from "razorpay"
 import { participantSchema } from "@/validators/participant.validator"
 
@@ -68,18 +69,45 @@ export function bookingFromOrderNotes(notes: unknown): OrderBooking | null {
 
 // The SDK sets no timeout of its own, so a hung call would hold the request
 // until the platform killed it.
-const ORDER_FETCH_TIMEOUT_MS = 8000
+export const RAZORPAY_TIMEOUT_MS = 8000
 
-/** Fetches an order and reads its booking. Throws when Razorpay cannot be reached in time. */
-export async function fetchOrderBooking(orderId: string): Promise<OrderBooking | null> {
+/** Settles as `work` does, or rejects with `message` once `ms` have passed. */
+export async function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("Timed out fetching the Razorpay order")), ORDER_FETCH_TIMEOUT_MS)
+    timer = setTimeout(() => reject(new Error(message)), ms)
   })
   try {
-    const order = await Promise.race([getRazorpay().orders.fetch(orderId), timeout])
-    return bookingFromOrderNotes(order.notes)
+    return await Promise.race([work, timeout])
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * Fetches an order and reads its booking. Throws when Razorpay cannot be
+ * reached within `timeoutMs`; the webhook passes a shorter limit than the
+ * default.
+ */
+export async function fetchOrderBooking(
+  orderId: string,
+  timeoutMs: number = RAZORPAY_TIMEOUT_MS
+): Promise<OrderBooking | null> {
+  const order = await withTimeout(getRazorpay().orders.fetch(orderId), timeoutMs, "Timed out fetching the Razorpay order")
+  return bookingFromOrderNotes(order.notes)
+}
+
+const HEX = /^(?:[0-9a-f]{2})+$/i
+
+/**
+ * Compares two hex signatures in constant time. Anything that is not a
+ * non-empty, even-length hex string compares false, so a malformed signature
+ * is an ordinary mismatch instead of the RangeError timingSafeEqual throws on
+ * unequal lengths. Upper and lower case spell the same bytes, so either matches.
+ */
+export function safeHexEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string" || !HEX.test(a) || !HEX.test(b)) return false
+  const left = Buffer.from(a, "hex")
+  const right = Buffer.from(b, "hex")
+  return left.length === right.length && timingSafeEqual(left, right)
 }

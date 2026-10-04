@@ -23,7 +23,14 @@ export const runtimeEnvSchema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   // Shared with the customer site's server-side proxy so per-visitor rate
   // limiting works behind it (Vercel overwrites x-forwarded-for on ingress).
+  // It also signs the webhook's ticket-mail requests to the site.
   PROXY_SHARED_SECRET: z.string().optional(),
+  // The customer site, which emails tickets for bookings the Razorpay webhook
+  // completes (src/lib/site-ticket-mail.ts). An empty value means the default.
+  SITE_URL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url("SITE_URL must be a valid URL").default("https://www.ulsaaham.com")
+  ),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 })
 

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client"
+import type { Event } from "@prisma/client"
 import {
   findParticipantById,
   findParticipantByTicketCode,
@@ -28,6 +29,7 @@ export async function getAllParticipants(eventId: string) {
 
 export const PHONE_ALREADY_REGISTERED = "Phone number already registered for this event"
 export const EVENT_FULL = "Event is full"
+export const EVENT_NOT_ACCEPTING = "Event is not accepting registrations"
 
 const TICKET_CODE_ATTEMPTS = 3
 
@@ -40,40 +42,54 @@ function uniqueViolationTarget(err: unknown): string | null {
   return null
 }
 
+/** The event fields registerParticipant reads. */
+type RegistrationEvent = Pick<Event, "id" | "slug" | "status" | "capacity" | "isCompetition" | "participationType">
+
 /**
  * Creates a booking (one ticket) for an event.
  *
  * A person may book the same event several times — each call creates its own
- * ticket. Paid bookings pass `paymentOrderId`; the call is then idempotent for
- * that order: the ticket code is derived from the order id, so a concurrent
- * replay (browser verify + Razorpay webhook, or a client retry) either finds
- * the existing booking or collides on the ticketCode unique index and returns
- * it, never creating a second ticket for one payment.
+ * ticket. Two keys make a call idempotent. Each is the seed of the booking's
+ * ticket code, so even a concurrent duplicate collides on the ticketCode
+ * unique index and gets the first booking back instead of a second ticket:
+ *  - `paymentOrderId` (paid bookings): a replay of the order (browser verify +
+ *    Razorpay webhook, or a client retry) returns the booking it created. That
+ *    lookup runs before the status check, so a retry after booking closed
+ *    still finds the ticket the payment bought.
+ *  - `requestId` (free and complimentary registrations): the site's id for one
+ *    submit, stored with the booking. The register route looks it up before
+ *    its own checks; here it seeds the code.
+ *
+ * Pass `event` when the caller has just read it and counted seats itself (the
+ * public register route), to skip reading the event and counting again.
  */
 export async function registerParticipant(
-  input: CreateParticipantInput
+  input: CreateParticipantInput,
+  options: { event?: RegistrationEvent } = {}
 ): Promise<{
   participant: Awaited<ReturnType<typeof createParticipant>>
   isNew: boolean
 }> {
-  const event = await findEventById(input.eventId)
-  if (!event) throw new Error("Event not found")
-  if (event.status !== "PUBLISHED") throw new Error("Event is not accepting registrations")
-
   const orderId = input.paymentOrderId || null
+  const requestId = orderId ? null : input.requestId || null
 
   if (orderId) {
     const replay = await findParticipantByEventAndOrderId(input.eventId, orderId)
     if (replay) return { participant: replay, isNew: false }
   }
 
+  const event = options.event ?? (await findEventById(input.eventId))
+  if (!event) throw new Error("Event not found")
+  if (event.status !== "PUBLISHED") throw new Error(EVENT_NOT_ACCEPTING)
+
   const quantityError = validateCompetitionQuantity(event, input.numberOfParticipants)
   if (quantityError) throw new Error(quantityError)
 
   // Capacity is enforced when the booking is initiated. For a paid booking the
   // money has already been taken by the time we get here (capacity was checked
-  // when the Razorpay order was created), so never reject it at this point.
-  if (!orderId && event.capacity !== null) {
+  // when the Razorpay order was created), so never reject it at this point. A
+  // caller that passes the event has counted seats itself.
+  if (!orderId && !options.event && event.capacity !== null) {
     const currentCount = await countParticipantsForEvent(input.eventId)
     if (currentCount + input.numberOfParticipants > event.capacity) {
       throw new Error(EVENT_FULL)
@@ -84,9 +100,15 @@ export async function registerParticipant(
     ? await allocateCompetitionNumber(event.id)
     : null
 
+  const seedKey = orderId ?? (requestId ? `request:${input.eventId}:${requestId}` : null)
+  /** Whether a booking holding our ticket code is this same order or submit. */
+  const isSameBooking = (clash: { eventId: string; paymentOrderId: string | null; requestId: string | null; phone: string }) =>
+    clash.eventId === input.eventId &&
+    (orderId ? clash.paymentOrderId === orderId : requestId !== null && clash.requestId === requestId && clash.phone === input.phone)
+
   for (let attempt = 0; attempt < TICKET_CODE_ATTEMPTS; attempt++) {
-    // Deterministic per order (attempt 0), salted on a genuine code clash.
-    const seed = orderId ? (attempt === 0 ? orderId : `${orderId}#${attempt}`) : undefined
+    // Deterministic per order or submit (attempt 0), salted on a genuine code clash.
+    const seed = seedKey ? (attempt === 0 ? seedKey : `${seedKey}#${attempt}`) : undefined
     const ticketCode = generateTicketCode(event.slug, seed)
 
     try {
@@ -102,6 +124,7 @@ export async function registerParticipant(
         isGroupRegistration: event.isCompetition && input.numberOfParticipants > 1,
         paymentOrderId: orderId,
         paymentId: input.paymentId || null,
+        ...(requestId && { requestId }),
         ...(input.amountPaid !== undefined && { amountPaid: input.amountPaid }),
         ...(input.entryType && { entryType: input.entryType }),
       })
@@ -117,9 +140,9 @@ export async function registerParticipant(
       }
 
       // ticketCode clash. For a seeded code this almost always means the same
-      // order was registered concurrently — hand back that booking.
+      // order or submit was registered concurrently — hand back that booking.
       const clash = await findParticipantByTicketCodeOnly(ticketCode)
-      if (clash && orderId && clash.eventId === input.eventId && clash.paymentOrderId === orderId) {
+      if (clash && seedKey && isSameBooking(clash)) {
         return { participant: clash, isNew: false }
       }
       // Otherwise a different booking owns this code: try again with a new one.

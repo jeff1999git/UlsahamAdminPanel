@@ -120,6 +120,10 @@ model Participant {
   // key that lets payment/verify and the webhook safely replay the same order.
   paymentOrderId       String?
   paymentId            String?
+  // The site's id for one free or complimentary registration submit: a retry
+  // with the same id gets this booking back. Looked up together with eventId
+  // (and phone), so it needs no index of its own.
+  requestId            String?
   attended             Boolean   @default(false)
   attendedAt           DateTime?
   enteredCount         Int       @default(0)

@@ -3,7 +3,7 @@
 import crypto from "crypto"
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import { getRazorpay, fetchOrderBooking, type OrderBooking } from "@/lib/razorpay"
+import { getRazorpay, fetchOrderBooking, safeHexEqual, type OrderBooking } from "@/lib/razorpay"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
 import { validateCompetitionQuantity } from "@/lib/competition"
 import { findEventById } from "@/repositories/event.repository"
@@ -116,7 +116,7 @@ export async function verifyAndEnrollAction(
   // HMAC-SHA256 signature verification — protects against tampered callbacks
   const body = `${paymentData.razorpay_order_id}|${paymentData.razorpay_payment_id}`
   const expected = crypto.createHmac("sha256", secret).update(body).digest("hex")
-  if (expected !== paymentData.razorpay_signature) {
+  if (!safeHexEqual(expected, paymentData.razorpay_signature)) {
     return { success: false, error: "Payment verification failed. Please contact support." }
   }
 

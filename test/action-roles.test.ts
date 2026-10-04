@@ -113,7 +113,10 @@ vi.mock("next-auth", () => ({
 vi.mock("bcryptjs", () => ({ default: { hash: m.hash, compare: vi.fn() } }))
 vi.mock("@/lib/activity-logger", () => ({ logActivity: m.logActivity }))
 vi.mock("@/lib/cloudinary", () => ({ deleteImage: m.deleteImage }))
-vi.mock("@/lib/razorpay", () => ({
+// safeHexEqual and the other helpers stay real; the two calls that would
+// reach Razorpay are replaced.
+vi.mock("@/lib/razorpay", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/razorpay")>()),
   getRazorpay: () => ({ orders: { create: m.ordersCreate } }),
   fetchOrderBooking: m.fetchOrderBooking,
 }))

@@ -107,8 +107,7 @@ describe("calculateCompetitionBase", () => {
 // replaced; pricing, validation and competition rules stay real.
 
 const mocks = vi.hoisted(() => ({
-  getPublishedEventBySlug: vi.fn(),
-  findEventCoupons: vi.fn(),
+  getBookableEventBySlug: vi.fn(),
   findEventById: vi.fn(),
   countParticipantsForEvent: vi.fn(async () => 0),
   findParticipantByTicketCodeOnly: vi.fn(async () => null),
@@ -116,18 +115,20 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/services/event.service", () => ({
-  getPublishedEventBySlug: mocks.getPublishedEventBySlug,
-  findEventCoupons: mocks.findEventCoupons,
+  getBookableEventBySlug: mocks.getBookableEventBySlug,
 }))
 vi.mock("@/repositories/event.repository", () => ({ findEventById: mocks.findEventById }))
 vi.mock("@/repositories/participant.repository", () => ({
   countParticipantsForEvent: mocks.countParticipantsForEvent,
   findParticipantByTicketCodeOnly: mocks.findParticipantByTicketCodeOnly,
 }))
-vi.mock("@/lib/razorpay", () => ({
+// withTimeout stays real; the order itself goes to the mock.
+vi.mock("@/lib/razorpay", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/razorpay")>()),
   getRazorpay: () => ({ orders: { create: mocks.ordersCreate } }),
   fetchOrderBooking: vi.fn(),
 }))
+vi.mock("@/lib/index-guard", () => ({ legacyIndexBlocksPhone: vi.fn(async () => false) }))
 vi.mock("@/services/participant.service", () => ({ registerParticipant: vi.fn() }))
 vi.mock("@/lib/activity-logger", () => ({ logActivity: vi.fn() }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
@@ -159,13 +160,14 @@ describe("charge paths use the golden table", () => {
   it.each(payable.map((c) => [c.id, c] as const))("public order route: %s", async (_id, c) => {
     const { POST } = await import("@/app/api/public/events/[slug]/payment/order/route")
     const event = eventRow(c)
-    mocks.getPublishedEventBySlug.mockResolvedValue({
+    mocks.getBookableEventBySlug.mockResolvedValue({
       ...event,
+      couponCodes: [{ code: "GOLDEN", discount: c.couponDiscount }],
+      complimentaryCodes: [],
       effectiveAmount: getEffectiveAmount(event),
       bookingClosedReason: null,
       bookingClosedMessage: null,
     })
-    mocks.findEventCoupons.mockResolvedValue([{ code: "GOLDEN", discount: c.couponDiscount }])
 
     const request = new NextRequest("http://localhost/api/public/events/golden/payment/order", {
       method: "POST",

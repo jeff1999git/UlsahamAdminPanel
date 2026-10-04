@@ -70,6 +70,43 @@ export async function findParticipantByEventAndOrderId(eventId: string, paymentO
   })
 }
 
+/** The booking recorded for a Razorpay order, on whichever event (paymentOrderId is indexed). */
+export async function findParticipantByOrderId(paymentOrderId: string) {
+  return prisma.participant.findFirst({
+    where: { paymentOrderId },
+  })
+}
+
+/**
+ * The booking recorded for a Razorpay order, with what its ticket shows about
+ * the event. payment/verify answers a retried confirmation from this alone,
+ * before any Razorpay call.
+ */
+export async function findBookingByOrderId(paymentOrderId: string) {
+  return prisma.participant.findFirst({
+    where: { paymentOrderId },
+    include: { event: { select: { slug: true, name: true, date: true, venue: true, isCompetition: true } } },
+  })
+}
+
+/** Whether a Razorpay order has a booking yet, and whether it is paid: the webhook's first check. */
+export async function findPaymentStateByOrderId(paymentOrderId: string) {
+  return prisma.participant.findFirst({
+    where: { paymentOrderId },
+    select: { id: true, amountPaid: true },
+  })
+}
+
+/**
+ * The booking a registration submit (the site's requestId) already created on
+ * this event for this phone. The (eventId, phone) index narrows the search.
+ */
+export async function findParticipantByEventAndRequestId(eventId: string, requestId: string, phone: string) {
+  return prisma.participant.findFirst({
+    where: { eventId, phone, requestId },
+  })
+}
+
 /** Participant row only (no event relation) for a ticket code. */
 export async function findParticipantByTicketCodeOnly(ticketCode: string) {
   return prisma.participant.findUnique({ where: { ticketCode } })

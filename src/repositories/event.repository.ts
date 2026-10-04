@@ -41,6 +41,57 @@ export async function findPublishedEventBySlug(slug: string) {
 }
 
 /**
+ * Everything the booking and payment routes read about an event, in one query
+ * with no participant count: status and times, venue, capacity, every pricing
+ * input, the competition rules and the coupon and complimentary codes.
+ */
+const BOOKABLE_EVENT_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  status: true,
+  date: true,
+  startTime: true,
+  endTime: true,
+  venue: true,
+  capacity: true,
+  isFree: true,
+  amount: true,
+  earlyBirdAmount: true,
+  isEarlyBird: true,
+  gstEnabled: true,
+  platformFeeEnabled: true,
+  isCompetition: true,
+  participationType: true,
+  groupExtraAmount: true,
+  couponCodes: true,
+  complimentaryCodes: true,
+} satisfies Prisma.EventSelect
+
+/**
+ * The event a booking or payment route works on. Ended and cancelled events
+ * are found too, so the routes can refuse them with their reason instead of
+ * "not found"; drafts (ANNOUNCED) are not.
+ */
+export async function findBookableEventBySlug(slug: string) {
+  return prisma.event.findFirst({
+    where: { slug, status: { in: [...PUBLIC_LIVE_STATUSES, "COMPLETED", "CANCELLED"] } },
+    select: BOOKABLE_EVENT_SELECT,
+  })
+}
+
+/**
+ * What a ticket shows about its event, for the payment status check. Drafts
+ * and cancelled events are not found.
+ */
+export async function findTicketEventBySlug(slug: string) {
+  return prisma.event.findFirst({
+    where: { slug, status: { in: [...PUBLIC_LIVE_STATUSES, "COMPLETED"] } },
+    select: { id: true, name: true, date: true, venue: true, isCompetition: true },
+  })
+}
+
+/**
  * Fields the admin events list needs (see AdminEventListItem), plus
  * archivedParticipantCount for the registered count. Selecting them keeps the
  * coupon and complimentary codes, descriptions and gallery out of the page.

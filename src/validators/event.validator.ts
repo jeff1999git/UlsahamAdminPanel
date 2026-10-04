@@ -170,9 +170,17 @@ export const createEventSchema = baseEventSchema
     }
   )
 
+// The edit form sends each complimentary code's usedCount back as it was when
+// the page loaded. An update drops it: updateExistingEvent keeps the count the
+// database holds.
+const complimentaryCodeEditSchema = complimentaryCodeSchema.omit({ usedCount: true })
+
 export const updateEventSchema = baseEventSchema
   .partial()
-  .extend({ id: z.string().min(1, "Event ID is required") })
+  .extend({
+    id: z.string().min(1, "Event ID is required"),
+    complimentaryCodes: z.array(complimentaryCodeEditSchema).optional(),
+  })
   .refine(
     (data) => {
       if (data.isFree === false && (data.amount === undefined || data.amount === null)) {
