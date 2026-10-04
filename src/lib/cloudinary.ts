@@ -37,11 +37,20 @@ export async function uploadImage(
   })
 }
 
-export async function deleteImage(publicId: string): Promise<void> {
+/**
+ * Deletes an image and invalidates its CDN copies, so no edge keeps serving
+ * it. True once the image is gone (deleted now, or already missing); false
+ * when Cloudinary could not do it, so the caller can try again later. Never
+ * throws.
+ */
+export async function deleteImage(publicId: string): Promise<boolean> {
   try {
-    await cloudinary.uploader.destroy(publicId)
-  } catch {
-    // Non-fatal: log but don't throw
-    console.error(`Failed to delete Cloudinary image: ${publicId}`)
+    const reply = (await cloudinary.uploader.destroy(publicId, { invalidate: true })) as { result?: unknown } | undefined
+    if (reply?.result === "ok" || reply?.result === "not found") return true
+    console.error(`Cloudinary did not delete image ${publicId}:`, reply?.result)
+    return false
+  } catch (error) {
+    console.error(`Failed to delete Cloudinary image ${publicId}:`, error)
+    return false
   }
 }

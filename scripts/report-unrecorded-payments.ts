@@ -6,6 +6,10 @@
  * ticket was returned instead). This script pairs captured payments with
  * bookings so those customers can be issued their tickets from the admin panel.
  *
+ * Bookings are deleted two weeks after their event, so a payment for such an
+ * event cannot be checked; it is listed as PRUNED (booking archived) rather
+ * than UNRECORDED. The pairing itself is in ./lib/payment-pairing.ts.
+ *
  * Usage (from the repo root, uses .env.local):
  *   npx tsx scripts/report-unrecorded-payments.ts [--days 90]
  *
@@ -15,6 +19,14 @@ import { readFileSync } from "fs"
 import { resolve } from "path"
 import { PrismaClient } from "@prisma/client"
 import Razorpay from "razorpay"
+import {
+  PRUNED,
+  UNRECORDED,
+  notesRecord,
+  pairPayments,
+  paymentsWithoutOrderMatch,
+  type RzpPayment,
+} from "./lib/payment-pairing"
 
 // Minimal .env.local loader (Node 20.11 has no process.loadEnvFile).
 try {
@@ -27,19 +39,6 @@ try {
 } catch {
   /* rely on the ambient environment */
 }
-
-type RzpPayment = {
-  id: string
-  order_id?: string | null
-  status: string
-  amount: number
-  created_at: number
-  email?: string
-  contact?: string
-  notes?: Record<string, string>
-}
-
-const PAIRING_WINDOW_MS = 30 * 60 * 1000 // booking written within 30 min of payment
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`)
@@ -67,63 +66,50 @@ async function main() {
   }
   payments.sort((a, b) => a.created_at - b.created_at)
 
-  // 2) Bookings we know about.
-  const participants = await prisma.participant.findMany({
-    select: {
-      id: true, eventId: true, phone: true, name: true, ticketCode: true, amountPaid: true,
-      numberOfParticipants: true, registeredAt: true, paymentOrderId: true, paymentId: true,
-    },
+  // 2) Bookings we know about, and every event's date and archived seat count
+  //    (to tell the events whose bookings the prune deleted).
+  const bookings = await prisma.participant.findMany({
+    select: { eventId: true, phone: true, ticketCode: true, amountPaid: true, registeredAt: true, paymentOrderId: true },
   })
-  const events = await prisma.event.findMany({ select: { id: true, name: true } })
-  const eventName = new Map(events.map((e) => [e.id, e.name]))
+  const events = await prisma.event.findMany({
+    select: { id: true, name: true, date: true, archivedParticipantCount: true },
+  })
 
-  const byOrder = new Map(participants.filter((p) => p.paymentOrderId).map((p) => [p.paymentOrderId!, p]))
-  const byTicket = new Map(participants.map((p) => [p.ticketCode, p]))
-  const legacyPool = new Map<string, typeof participants>() // eventId|phone -> unclaimed bookings
-  for (const p of participants) {
-    if (p.paymentOrderId) continue
-    const k = `${p.eventId}|${p.phone}`
-    legacyPool.set(k, [...(legacyPool.get(k) ?? []), p])
-  }
-  for (const list of legacyPool.values()) list.sort((a, b) => a.registeredAt.getTime() - b.registeredAt.getTime())
-
-  // 3) Pair each payment with a booking; whatever is left over was never recorded.
-  const unrecorded: Array<Record<string, string | number>> = []
-  let recorded = 0
-  for (const pay of payments) {
-    const notes = pay.notes ?? {}
-    const eventId = notes.eventId
-    const phone = notes.phone
-    if (!eventId || !phone) continue // not a ticket payment
-
-    if (pay.order_id && byOrder.has(pay.order_id)) { recorded++; continue }
-    if (notes.ticketCode && byTicket.get(notes.ticketCode)?.amountPaid) { recorded++; continue }
-
-    // Legacy pairing: the booking written closest after this payment for the same event+phone.
-    const pool = legacyPool.get(`${eventId}|${phone}`) ?? []
-    const payAt = pay.created_at * 1000
-    const idx = pool.findIndex((p) => Math.abs(p.registeredAt.getTime() - payAt) <= PAIRING_WINDOW_MS)
-    if (idx >= 0) { pool.splice(idx, 1); recorded++; continue }
-
-    unrecorded.push({
-      paymentId: pay.id,
-      orderId: pay.order_id ?? "",
-      paidAt: new Date(payAt).toISOString(),
-      amountINR: (pay.amount / 100).toFixed(2),
-      event: eventName.get(eventId) ?? eventId,
-      name: notes.name ?? "",
-      phone,
-      email: notes.email ?? "",
-      quantity: notes.numberOfParticipants ?? "1",
-    })
+  // 3) What each order not claimed by a booking was for, from the notes the
+  //    server wrote on it (the payment's own notes are payer-settable).
+  const orderNotes = new Map<string, Record<string, string>>()
+  for (const pay of paymentsWithoutOrderMatch(payments, bookings)) {
+    if (!pay.order_id || orderNotes.has(pay.order_id)) continue
+    try {
+      const order = (await rzp.orders.fetch(pay.order_id)) as { notes?: unknown }
+      orderNotes.set(pay.order_id, notesRecord(order.notes))
+    } catch (err) {
+      console.warn(`Could not fetch order ${pay.order_id}; using payment ${pay.id}'s own notes.`, err)
+    }
   }
 
-  console.log(`Captured ticket payments in last ${days} days: ${recorded + unrecorded.length} (recorded: ${recorded}, UNRECORDED: ${unrecorded.length})`)
-  if (unrecorded.length) {
-    console.table(unrecorded)
+  // 4) Pair each payment with a booking; whatever is left over was never recorded.
+  const { recorded, rows } = pairPayments({ payments, bookings, events, orderNotes, now: new Date() })
+  const unrecorded = rows.filter((row) => row.status === UNRECORDED).length
+  const pruned = rows.filter((row) => row.status === PRUNED).length
+
+  console.log(
+    `Captured ticket payments in last ${days} days: ${recorded + rows.length} ` +
+      `(recorded: ${recorded}, UNRECORDED: ${unrecorded}, for pruned events: ${pruned})`
+  )
+  if (rows.length) {
+    console.table(rows)
+  }
+  if (unrecorded) {
     console.log(
-      "Issue these bookings via Admin > Event > Participants > Add, quoting the Razorpay payment id. " +
+      "Issue the UNRECORDED bookings via Admin > Event > Participants > Add, quoting the Razorpay payment id. " +
         "Anything added there is recorded as Complimentary, so these will not count towards dashboard revenue."
+    )
+  }
+  if (pruned) {
+    console.log(
+      `${PRUNED}: the event is over two weeks past and its bookings were deleted, so these cannot be checked here. ` +
+        "Their seat and revenue totals are kept on the event."
     )
   }
   await prisma.$disconnect()

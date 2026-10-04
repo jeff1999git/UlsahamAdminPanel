@@ -1,5 +1,6 @@
 "use server"
 
+import { z } from "zod"
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { logActivity } from "@/lib/activity-logger"
@@ -12,9 +13,9 @@ import {
   scanForEntry,
   scanForEntryGlobal,
   markEntry,
+  importParticipants,
 } from "@/services/participant.service"
 import { participantSchema } from "@/validators/participant.validator"
-import { findParticipantByEventAndPhone } from "@/repositories/participant.repository"
 import { findEventById } from "@/repositories/event.repository"
 import type { ActionResult } from "@/types"
 import type { Participant } from "@prisma/client"
@@ -389,6 +390,26 @@ export type BulkImportResult = {
   errors: Array<{ row: number; name: string; error: string }>
 }
 
+const MAX_IMPORT_ROWS = 1000
+
+// The dialog checks every row before sending it; they are checked again here,
+// where it counts. One import adds at most MAX_IMPORT_ROWS rows, so it stays
+// well inside the function's time limit.
+const importRowsSchema = z
+  .array(participantSchema.extend({ row: z.number() }))
+  .max(MAX_IMPORT_ROWS, `One import can add at most ${MAX_IMPORT_ROWS.toLocaleString("en-IN")} rows. Split the file and import each part.`)
+
+/** The first problem with the rows, naming the spreadsheet row it is on. */
+function importRowsError(error: z.ZodError, rows: unknown): string {
+  const tooMany = error.issues.find((issue) => issue.path.length === 0)
+  if (tooMany) return Array.isArray(rows) ? tooMany.message : "Invalid import data"
+  const issue = error.issues[0]
+  const index = issue?.path[0]
+  if (typeof index !== "number" || !Array.isArray(rows)) return "Invalid import data"
+  const row = (rows[index] as { row?: unknown } | null)?.row
+  return `Row ${typeof row === "number" ? row : index + 1}: ${issue.message}`
+}
+
 export async function bulkAddParticipantsAction(
   eventId: string,
   rows: BulkImportRow[]
@@ -396,36 +417,19 @@ export async function bulkAddParticipantsAction(
   const session = await getSession()
   if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
-  const result: BulkImportResult = { added: 0, skipped: 0, errors: [] }
+  const parsed = importRowsSchema.safeParse(rows)
+  if (!parsed.success) return { success: false, error: importRowsError(parsed.error, rows) }
 
-  for (const row of rows) {
-    try {
-      // Re-running an import must not duplicate people: skip phones already on the event.
-      const existing = await findParticipantByEventAndPhone(eventId, row.phone)
-      if (existing) {
-        result.skipped++
-        continue
-      }
-
-      await registerParticipant({
-        eventId,
-        name: row.name,
-        phone: row.phone,
-        email: row.email || null,
-        age: row.age,
-        numberOfParticipants: row.numberOfParticipants,
-        // Everyone added from the admin panel enters as complimentary.
-        amountPaid: true,
-        entryType: "COMPLIMENTARY",
-      })
-      result.added++
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Failed to add"
-      if (msg === "Phone number already registered for this event") {
-        result.skipped++
-      } else {
-        result.errors.push({ row: row.row, name: row.name, error: msg })
-      }
+  let result: BulkImportResult
+  try {
+    result = await importParticipants(eventId, parsed.data)
+  } catch (error) {
+    // Bookings written before the failure stay, and a second run skips them.
+    console.error("Participant import failed:", error)
+    revalidatePath(`/admin/events/${eventId}/participants`)
+    return {
+      success: false,
+      error: "The import stopped part-way. Refresh the page to see who was added; importing the same file again skips them.",
     }
   }
 

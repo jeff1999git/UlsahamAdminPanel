@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { downloadParticipationCardPdf, preloadParticipationCardPdf } from "@/lib/participation-card-pdf"
+import { DEFAULT_TICKET_CONTACTS, type TicketContacts } from "@/lib/ticket-contacts"
 import { isChunkLoadError } from "@/lib/utils"
 
 const QRCode = dynamic(() => import("react-qr-code"), {
@@ -32,6 +33,8 @@ interface QRCodeModalProps {
   competitionInstructions?: string | null
   competitionNotes?: string | null
   bannerImageUrl?: string | null
+  /** The contact lines the ticket and the card print; Settings' phone and Instagram. */
+  contacts?: TicketContacts
   fullWidth?: boolean
   /**
    * Controlled use: pass `open` and the dialog renders no button of its own,
@@ -136,6 +139,7 @@ async function generateTicketCanvas(
     eventVenue: string
     numberOfParticipants: number
     bannerImageUrl?: string | null
+    contacts: TicketContacts
   }
 ): Promise<HTMLCanvasElement> {
   const [qrImg, posterImg, logoImg] = await Promise.all([
@@ -162,7 +166,8 @@ async function generateTicketCanvas(
   // "EVENT TICKET" heading (52) + 3 rows × 70px each
   const INFO_H = 52 + 3 * 70
   const QR_BOX_Y = INFO_Y_START + INFO_H + 16
-  const QR_BOX_H = QR_SIZE + QR_BOX_PAD * 2 + 30
+  // Caption and ticket code under the QR (30 + 20).
+  const QR_BOX_H = QR_SIZE + QR_BOX_PAD * 2 + 50
   const FOOTER_Y = QR_BOX_Y + QR_BOX_H + 20
   const H = FOOTER_Y + 84
 
@@ -267,6 +272,11 @@ async function generateTicketCanvas(
   ctx.font = "14px Arial, sans-serif"
   ctx.fillText("Scan this code at the entrance", W / 2, QR_Y_POS + QR_SIZE + 22)
 
+  // The code itself, for the gate to type in when the QR will not scan.
+  ctx.fillStyle = "#111"
+  ctx.font = "bold 16px 'Courier New', Courier, monospace"
+  ctx.fillText(opts.ticketCode, W / 2, QR_Y_POS + QR_SIZE + 44)
+
   // ── Footer ────────────────────────────────────────────────────
   ctx.strokeStyle = "#00000015"
   ctx.lineWidth = 1
@@ -277,8 +287,8 @@ async function generateTicketCanvas(
 
   ctx.fillStyle = "#000"
   ctx.font = "bold 17px Arial, sans-serif"
-  ctx.fillText("Contact : 9446266011", W / 2, FOOTER_Y + 28)
-  ctx.fillText("Instagram : @ulsaham_", W / 2, FOOTER_Y + 58)
+  ctx.fillText(`Contact : ${opts.contacts.phone}`, W / 2, FOOTER_Y + 28)
+  ctx.fillText(`Instagram : ${opts.contacts.instagram}`, W / 2, FOOTER_Y + 58)
 
   return canvas
 }
@@ -294,6 +304,7 @@ export function QRCodeModal({
   competitionInstructions,
   competitionNotes,
   bannerImageUrl,
+  contacts = DEFAULT_TICKET_CONTACTS,
   fullWidth = false,
   open: openProp,
   onOpenChange,
@@ -333,6 +344,7 @@ export function QRCodeModal({
             ticketCode,
             instructions: competitionInstructions,
             notes: competitionNotes,
+            contacts,
           },
           `participation-card-${ticketCode}.pdf`
         )
@@ -352,6 +364,7 @@ export function QRCodeModal({
         eventVenue,
         numberOfParticipants,
         bannerImageUrl,
+        contacts,
       })
       canvas.toBlob((blob) => {
         if (!blob) return
@@ -362,7 +375,9 @@ export function QRCodeModal({
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        // Revoked a moment later: some browsers cancel a download whose URL
+        // is revoked in the same task as the click.
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
       }, "image/png")
     } catch (error) {
       toast.error(

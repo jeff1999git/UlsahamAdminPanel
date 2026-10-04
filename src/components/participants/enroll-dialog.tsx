@@ -35,6 +35,8 @@ import { participantSchema, type ParticipantFormValues } from "@/validators/part
 import { addParticipantAction } from "@/actions/participant.actions"
 import { createPaymentOrderAction, verifyAndEnrollAction } from "@/actions/payment.actions"
 import { calculateTicketFees, calculateCompetitionFees } from "@/lib/pricing"
+import { runCounterCheckout } from "@/lib/counter-checkout"
+import { ACTION_FAILED_MESSAGE } from "@/constants"
 import type { AdminEventListItem } from "@/types/event.types"
 
 interface EnrollDialogProps {
@@ -116,9 +118,14 @@ export function EnrollDialog({
       return
     }
     if (isFree) {
-      const result = await addParticipantAction(eventId, values)
-      if (!result.success) {
-        toast.error(result.error)
+      try {
+        const result = await addParticipantAction(eventId, values)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
+      } catch {
+        toast.error(ACTION_FAILED_MESSAGE)
         return
       }
       setStep("success")
@@ -133,10 +140,17 @@ export function EnrollDialog({
       return
     }
 
-    const orderResult = await createPaymentOrderAction(
-      eventId,
-      values as unknown as Record<string, unknown>
-    )
+    let orderResult: Awaited<ReturnType<typeof createPaymentOrderAction>>
+    try {
+      orderResult = await createPaymentOrderAction(
+        eventId,
+        values as unknown as Record<string, unknown>
+      )
+    } catch {
+      // No order exists yet, so nothing was charged and trying again is safe.
+      toast.error(ACTION_FAILED_MESSAGE)
+      return
+    }
     if (!orderResult.success) {
       toast.error(orderResult.error)
       return
@@ -144,8 +158,10 @@ export function EnrollDialog({
 
     const { orderId, amount: orderAmount, currency, keyId } = orderResult.data
 
-    await new Promise<void>((resolve) => {
-      const rzp = new window.Razorpay({
+    // Settles in every case, so the button never stays on "Processing...".
+    const outcome = await runCounterCheckout(
+      window.Razorpay,
+      {
         key: keyId,
         amount: orderAmount,
         currency,
@@ -158,29 +174,24 @@ export function EnrollDialog({
           contact: values.phone,
         },
         theme: { color: "#014421" },
-        handler: async (response) => {
-          const enrollResult = await verifyAndEnrollAction(
-            response,
-            eventId,
-            values as unknown as Record<string, unknown>
-          )
-          if (!enrollResult.success) {
-            toast.error(enrollResult.error)
-          } else {
-            setStep("success")
-            onEnrolled?.()
-          }
-          resolve()
-        },
-        modal: {
-          ondismiss: () => {
-            toast.info("Payment cancelled")
-            resolve()
-          },
-        },
-      })
-      rzp.open()
-    })
+      },
+      (response) => verifyAndEnrollAction(response, eventId, values as unknown as Record<string, unknown>)
+    )
+    if (outcome.status === "enrolled") {
+      setStep("success")
+      onEnrolled?.()
+    } else if (outcome.status === "failed") {
+      // After Razorpay has taken the money the message stays until it is closed
+      // and names the payment, so the Pay button is not pressed again blindly.
+      toast.error(
+        outcome.error,
+        outcome.paymentId
+          ? { description: `Payment ID: ${outcome.paymentId}`, duration: Infinity, closeButton: true }
+          : undefined
+      )
+    } else {
+      toast.info("Payment cancelled")
+    }
   }
 
   return (

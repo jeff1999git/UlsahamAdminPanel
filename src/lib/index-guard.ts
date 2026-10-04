@@ -11,6 +11,20 @@ import { findParticipantByEventAndPhone } from "@/repositories/participant.repos
 const CHECK_TTL_MS = 10 * 60_000
 /** A failed check is retried sooner, so one blip does not switch the guard off for ten minutes. */
 const FAILED_CHECK_TTL_MS = 60_000
+/**
+ * Every booking on the instance waits for the shared answer, so a check still
+ * unanswered after this long counts as failed instead of holding them up.
+ */
+const CHECK_TIMEOUT_MS = 3000
+
+/** Settles as `work` does, or rejects once `ms` have passed. */
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`listIndexes did not answer within ${ms} ms`)), ms)
+  })
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer))
+}
 
 /** Unique indexes the schema declares: _id (implicitly unique) and ticketCode. */
 function isDeclaredUnique(key: unknown): boolean {
@@ -31,16 +45,16 @@ export function legacyUniqueIndexNames(reply: unknown): string[] {
 
 /**
  * The cached check: `listIndexes` runs at most once per CHECK_TTL_MS (requests
- * arriving meanwhile share its answer). A check that fails is logged and
- * counts as "no legacy index". Exported with the lookup and clock injectable
- * for tests.
+ * arriving meanwhile share its answer). A check that fails or does not answer
+ * within CHECK_TIMEOUT_MS is logged and counts as "no legacy index". Exported
+ * with the lookup and clock injectable for tests.
  */
 export function createIndexGuard(listIndexes: () => Promise<unknown>, now: () => number = Date.now) {
   let cached: { names: Promise<string[]>; expiresAt: number } | null = null
   return function legacyUniqueIndexes(): Promise<string[]> {
     if (cached && now() < cached.expiresAt) return cached.names
     const entry = { names: Promise.resolve<string[]>([]), expiresAt: now() + CHECK_TTL_MS }
-    entry.names = (async () => legacyUniqueIndexNames(await listIndexes()))().catch((error: unknown) => {
+    entry.names = (async () => legacyUniqueIndexNames(await withDeadline(listIndexes(), CHECK_TIMEOUT_MS)))().catch((error: unknown) => {
       console.error("[index-guard] Could not list the Participant indexes; the legacy-index guard is off until the next check:", error)
       entry.expiresAt = now() + FAILED_CHECK_TTL_MS
       return []

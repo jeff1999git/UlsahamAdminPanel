@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { EventStatus, ParticipationType } from "@prisma/client"
-import { hasEventEnded } from "@/lib/event-time"
+import { hasEventEnded, toEventDay } from "@/lib/event-time"
 
 // The enum values as plain literals. The event form runs this schema in the
 // browser, and importing the Prisma enums as values would pull the Prisma
@@ -76,7 +76,11 @@ const baseEventSchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().url("Must be a valid URL").optional().nullable()
   ),
-  date: z.coerce.date({ required_error: "Event date is required" }),
+  // A cleared date input sends no date, which coercion turns into an invalid
+  // date; it reads as a missing one rather than zod's "Invalid date".
+  date: z.coerce.date({
+    errorMap: (issue, ctx) => ({ message: issue.code === "invalid_date" ? "Event date is required" : ctx.defaultError }),
+  }),
   startTime: z
     .string()
     .min(1, "Start time is required")
@@ -127,12 +131,12 @@ export const createEventSchema = baseEventSchema
       path: ["amount"],
     }
   )
+  // Days compare in IST, the zone the form's date picker and the saved event
+  // use, so the browser and the server (UTC) agree between 00:00 and 05:30 IST.
   .refine(
     (data) => {
       if (!data.date) return true
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      return data.date >= today
+      return toEventDay(data.date).getTime() >= toEventDay(new Date()).getTime()
     },
     {
       message: "Event date must be today or in the future",

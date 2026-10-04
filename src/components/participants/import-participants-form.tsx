@@ -192,7 +192,8 @@ export function ImportParticipantsForm({ eventId, onClose }: ImportParticipantsF
         toast.error(res.error ?? "Import failed")
       }
     } catch {
-      toast.error("Import failed. Check your connection and try again.")
+      // The import may have stopped part-way; a second run skips whoever was added.
+      toast.error("Import failed or timed out. Refresh the page to see who was added; importing the same file again skips them.")
     } finally {
       setImporting(false)
     }

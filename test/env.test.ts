@@ -62,6 +62,17 @@ describe("runtime env", () => {
     await loadEnv()
     expect(warn).not.toHaveBeenCalled()
   })
+
+  it("SITE_URL is optional: unset or empty means the live site, and a value must be a URL", () => {
+    delete process.env.SITE_URL
+    expect(runtimeEnvSchema.parse(process.env).SITE_URL).toBe("https://www.ulsaaham.com")
+    process.env.SITE_URL = ""
+    expect(runtimeEnvSchema.parse(process.env).SITE_URL).toBe("https://www.ulsaaham.com")
+    process.env.SITE_URL = "https://preview.example"
+    expect(runtimeEnvSchema.parse(process.env).SITE_URL).toBe("https://preview.example")
+    process.env.SITE_URL = "www.ulsaaham.com"
+    expect(runtimeEnvSchema.safeParse(process.env).success).toBe(false)
+  })
 })
 
 describe("seed env", () => {

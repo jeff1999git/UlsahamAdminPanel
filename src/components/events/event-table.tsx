@@ -63,6 +63,8 @@ export function EventTable({ events, isUser = false, isSuperAdmin = false }: Eve
     } catch {}
   }, [isUser])
 
+  // Marks the event enrolled on this device. The dialog stays open on its
+  // success step, and its Close button closes it.
   function handleEnrolled(eventId: string) {
     setEnrolledEventIds((prev) => {
       const next = new Set(prev)
@@ -72,7 +74,6 @@ export function EventTable({ events, isUser = false, isSuperAdmin = false }: Eve
       } catch {}
       return next
     })
-    setEnrollEvent(null)
   }
 
   if (events.length === 0) {

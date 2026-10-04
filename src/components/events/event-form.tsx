@@ -33,7 +33,8 @@ import { MultiImageUpload } from "@/components/shared/multi-image-upload"
 import { createEventSchema, MAX_GALLERY_IMAGES, type CreateEventFormValues } from "@/validators/event.validator"
 import { createEventAction, updateEventAction } from "@/actions/event.actions"
 import { generateSlug } from "@/lib/slug"
-import { ACTION_FAILED_MESSAGE, WEBSITE_UPDATE_NOTE_EVENTS } from "@/constants"
+import { istDateString, toEventDay } from "@/lib/event-time"
+import { ACTION_FAILED_MESSAGE, SLUG_IN_USE_MESSAGE, WEBSITE_UPDATE_NOTE_EVENTS } from "@/constants"
 import type { Event } from "@prisma/client"
 
 interface EventFormProps {
@@ -80,7 +81,9 @@ export function EventForm({ event }: EventFormProps) {
       bannerImageId: ev?.bannerImageId ?? "",
       venue: ev?.venue ?? "",
       venueLink: ev?.venueLink ?? "",
-      date: ev?.date ? new Date(ev.date) : new Date(),
+      // A new event starts on today in India, stored as that day's UTC midnight
+      // like a picked date; "now" would read as yesterday before 05:30 IST.
+      date: ev?.date ? new Date(ev.date) : toEventDay(new Date()),
       startTime: ev?.startTime ?? "10:00 AM",
       endTime: ev?.endTime ?? "05:00 PM",
       isFree: ev?.isFree ?? true,
@@ -177,6 +180,7 @@ export function EventForm({ event }: EventFormProps) {
     }
 
     if (!result.success) {
+      if (result.error === SLUG_IN_USE_MESSAGE) form.setError("slug", { type: "server", message: result.error })
       toast.error(result.error)
       return
     }
@@ -296,15 +300,18 @@ export function EventForm({ event }: EventFormProps) {
                       <FormItem>
                         <FormLabel>Date *</FormLabel>
                         <FormControl>
+                          {/* Clearing the input gives "": the field then holds no
+                              date, which validation reports, instead of an
+                              invalid Date that cannot be shown. */}
                           <Input
                             type="date"
                             value={
-                              field.value
-                                ? new Date(field.value).toISOString().split("T")[0]
+                              field.value instanceof Date && !Number.isNaN(field.value.getTime())
+                                ? field.value.toISOString().slice(0, 10)
                                 : ""
                             }
-                            min={!isEditing ? new Date().toISOString().split("T")[0] : undefined}
-                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                            min={!isEditing ? istDateString() : undefined}
+                            onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
                           />
                         </FormControl>
                         <FormMessage />

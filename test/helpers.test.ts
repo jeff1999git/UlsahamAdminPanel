@@ -34,14 +34,23 @@ describe("sanitizeString", () => {
     ['<img src="x" onerror="alert(1)">Gallery', "Gallery"],
     ["5 > 3", "5 > 3"],
     ["", ""],
+    ["<a href='https://x.test'>link</a>", "link"],
+    ["<DIV CLASS=x>caps</DIV>", "caps"],
+    ["line<br/>break", "linebreak"],
+    ["<svg/onload=alert(1)>Hi", "Hi"],
   ])("%j -> %j", (input, expected) => {
     expect(sanitizeString(input)).toBe(expected)
   })
 
-  // Current behaviour, not a goal: plain text with a "<" before a ">" loses
-  // everything between them, e.g. in an event description.
-  it("drops text between a < and a later >", () => {
-    expect(sanitizeString("ages < 12 and > 5")).toBe("ages  5")
+  // Only real tags go: < and > used as signs in plain text, such as an event
+  // description, are kept with everything between them.
+  it.each([
+    ["ages < 12 and > 5", "ages < 12 and > 5"],
+    ["a <3 b > c", "a <3 b > c"],
+    ["price <= 500 => ok", "price <= 500 => ok"],
+    ["Rs. 100 < Rs. 200 <b>bold</b>", "Rs. 100 < Rs. 200 bold"],
+  ])("keeps %j as text", (input, expected) => {
+    expect(sanitizeString(input)).toBe(expected)
   })
 })
 

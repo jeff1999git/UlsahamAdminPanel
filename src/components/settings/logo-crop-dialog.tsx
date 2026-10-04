@@ -20,7 +20,9 @@ import {
 
 interface LogoCropDialogProps {
   open: boolean
+  /** The picked file as an object URL, which the caller owns and revokes. */
   imgSrc: string
+  /** `previewUrl` is a new object URL; the caller revokes it once nothing shows it. */
   onCropped: (blob: Blob, previewUrl: string) => void
   onCancel: () => void
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import Image from "next/image"
 import { Upload, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -27,6 +27,24 @@ export function ImageUpload({
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(value ?? null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // A picked file previews through an object URL, which stays on screen after
+  // the upload. It is revoked when another preview replaces it, when it is
+  // cleared and on unmount, so the browser can free the image.
+  const objectUrlRef = useRef<string | null>(null)
+
+  const showPreview = useCallback((url: string | null) => {
+    const previous = objectUrlRef.current
+    if (previous && previous !== url) URL.revokeObjectURL(previous)
+    objectUrlRef.current = url?.startsWith("blob:") ? url : null
+    setPreview(url)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    },
+    []
+  )
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,8 +56,7 @@ export function ImageUpload({
         return
       }
 
-      const localPreview = URL.createObjectURL(file)
-      setPreview(localPreview)
+      showPreview(URL.createObjectURL(file))
       setUploading(true)
 
       try {
@@ -67,18 +84,18 @@ export function ImageUpload({
         const data = await res.json()
         onChange(data.url, data.publicId)
       } catch (error) {
-        setPreview(value ?? null)
+        showPreview(value ?? null)
         toast.error(error instanceof Error ? error.message : "Upload failed")
       } finally {
         setUploading(false)
         if (inputRef.current) inputRef.current.value = ""
       }
     },
-    [onChange, value]
+    [onChange, value, showPreview]
   )
 
   function handleClear() {
-    setPreview(null)
+    showPreview(null)
     if (inputRef.current) inputRef.current.value = ""
     onClear?.()
   }

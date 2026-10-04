@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import crypto from "crypto"
 import { getCorsHeaders, corsOptionsResponse } from "@/lib/cors"
 import { verifyRateLimit, allow, getClientIP } from "@/lib/ratelimit"
-import { fetchOrderBooking, safeHexEqual } from "@/lib/razorpay"
+import { chargeFields, fetchOrderBooking, safeHexEqual } from "@/lib/razorpay"
 import { ticketPayload } from "@/lib/ticket-payload"
+import { logActivity } from "@/lib/activity-logger"
+import { duplicatePaymentLog } from "@/lib/duplicate-payment"
 import { getBookableEventBySlug } from "@/services/event.service"
 import {
   findBookingByOrderId,
@@ -142,9 +144,11 @@ export async function POST(
     const booking = orderResult.value
     const event = eventResult.value
 
+    // Only a buyer whose payment went through gets here, so both answers say
+    // what to do next.
     if (!event) {
       return NextResponse.json(
-        { success: false, error: "Event not found", code: "EVENT_NOT_FOUND" },
+        { success: false, error: "Event not found. Please contact support with your payment ID.", code: "EVENT_NOT_FOUND" },
         { status: 404, headers: corsHeaders }
       )
     }
@@ -172,14 +176,20 @@ export async function POST(
           { status: 404, headers: corsHeaders }
         )
       }
-      const updated = existing.amountPaid
-        ? existing
-        : await updateParticipant(existing.id, {
-            amountPaid: true,
-            entryType: "PAID",
-            paymentId: razorpay_payment_id,
-            paymentOrderId: existing.paymentOrderId ?? razorpay_order_id,
-          })
+      let updated = existing
+      if (!existing.amountPaid) {
+        updated = await updateParticipant(existing.id, {
+          amountPaid: true,
+          entryType: "PAID",
+          paymentId: razorpay_payment_id,
+          paymentOrderId: existing.paymentOrderId ?? razorpay_order_id,
+          ...chargeFields(booking),
+        })
+      } else if (existing.paymentId !== razorpay_payment_id) {
+        // Paid twice (two tabs, or two orders while it was unpaid): the ticket
+        // stands, and the extra payment is logged for staff to refund.
+        after(() => logActivity(duplicatePaymentLog("payment-verify", existing, ids)))
+      }
       return NextResponse.json(
         { success: true, message: CONFIRMED, data: ticketPayload(updated, event, ids) },
         { status: 200, headers: corsHeaders }
@@ -200,12 +210,18 @@ export async function POST(
         entryType: "PAID",
         paymentOrderId: razorpay_order_id,
         paymentId: razorpay_payment_id,
+        amountPaidPaise: booking.amountPaise,
       },
       { event }
     )
 
     if (!participant.amountPaid) {
-      await updateParticipant(participant.id, { amountPaid: true, entryType: "PAID", paymentId: razorpay_payment_id })
+      await updateParticipant(participant.id, {
+        amountPaid: true,
+        entryType: "PAID",
+        paymentId: razorpay_payment_id,
+        ...chargeFields(booking),
+      })
     }
 
     return NextResponse.json(

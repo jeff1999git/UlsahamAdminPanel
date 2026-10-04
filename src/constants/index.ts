@@ -20,6 +20,10 @@ export const IST_TIMEZONE = "Asia/Kolkata"
 export const WEBSITE_UPDATE_NOTE_EVENTS = "The website shows this within about a minute (past events: within an hour)."
 export const WEBSITE_UPDATE_NOTE_PARTNERS = "The website shows this within an hour."
 
+// An event save refused because the slug (the event's web address) belongs to
+// another event. The event form matches it to mark the Slug field.
+export const SLUG_IN_USE_MESSAGE = "Another event already uses this slug. Choose a different one."
+
 // Shown when a server action call throws instead of returning a result: the
 // connection dropped, the session ended (a refresh then leads to sign-in), or
 // the server failed.

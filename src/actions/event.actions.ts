@@ -94,7 +94,12 @@ export async function updateEventAction(
   }
 }
 
-export async function deleteEventAction(id: string): Promise<ActionResult<void>> {
+/**
+ * Deletes an event, or cancels it when it has bookings. A delete redirects to
+ * the events list; a cancel returns `{ outcome: "cancelled" }`, so the page
+ * can say the event was cancelled, and the browser then goes to the list.
+ */
+export async function deleteEventAction(id: string): Promise<ActionResult<{ outcome: "cancelled" }>> {
   const session = await getSession()
   if (session.role !== "SUPER_ADMIN") return { success: false, error: "Forbidden" }
 
@@ -102,7 +107,25 @@ export async function deleteEventAction(id: string): Promise<ActionResult<void>>
     const existing = await getEventById(id)
     if (!existing) return { success: false, error: "Event not found" }
 
-    await deleteEventWithCleanup(id)
+    const result = await deleteEventWithCleanup(id)
+
+    if (result.outcome === "cancelled") {
+      const bookings = `${result.bookings} booking${result.bookings === 1 ? "" : "s"}`
+      await logActivity({
+        adminUsername: session.username,
+        adminRole: session.role,
+        action: "EVENT_STATUS_CHANGED",
+        entity: "Event",
+        entityId: id,
+        description: `Cancelled event (${bookings}, so not deleted): ${existing.name}`,
+        metadata: { newStatus: "CANCELLED", bookings: result.bookings },
+      })
+
+      revalidatePath("/admin/events")
+      revalidatePath(`/admin/events/${id}/edit`)
+      // The event still exists, so its edit page can render with this result.
+      return { success: true, data: { outcome: "cancelled" } }
+    }
 
     await logActivity({
       adminUsername: session.username,

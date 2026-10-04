@@ -8,8 +8,9 @@ import {
 } from "@/repositories/participant.repository"
 import { registerParticipant } from "@/services/participant.service"
 import { logActivity } from "@/lib/activity-logger"
-import { fetchOrderBooking, safeHexEqual } from "@/lib/razorpay"
+import { chargeFields, fetchOrderBooking, safeHexEqual } from "@/lib/razorpay"
 import { requestTicketMail } from "@/lib/site-ticket-mail"
+import { duplicatePaymentLog } from "@/lib/duplicate-payment"
 
 // Razorpay waits about 5 s for an answer and retries a delivery that fails.
 // The order fetch gives up after 3 s, so a slow Razorpay ends in a 500 that is
@@ -95,12 +96,19 @@ export async function POST(request: NextRequest) {
         console.error("[Razorpay Webhook] Re-payment ticket not found", { eventId, ticketCode: booking.ticketCode })
         return NextResponse.json({ status: "skipped" })
       }
-      if (!ticket.amountPaid) {
+      if (ticket.amountPaid) {
+        // Paid twice (two tabs, or two orders while it was unpaid): the ticket
+        // stands, and the extra payment is logged for staff to refund.
+        if (paymentId && ticket.paymentId !== paymentId) {
+          after(() => logActivity(duplicatePaymentLog("razorpay-webhook", ticket, { paymentId, orderId })))
+        }
+      } else {
         await updateParticipant(ticket.id, {
           amountPaid: true,
           entryType: "PAID",
           paymentId: paymentId ?? null,
           paymentOrderId: ticket.paymentOrderId ?? orderId,
+          ...chargeFields(booking),
         })
         afterResponse(
           {
@@ -124,7 +132,12 @@ export async function POST(request: NextRequest) {
     const existing = await findParticipantByEventAndOrderId(eventId, orderId)
     if (existing) {
       if (!existing.amountPaid) {
-        await updateParticipant(existing.id, { amountPaid: true, entryType: "PAID", paymentId: paymentId ?? null })
+        await updateParticipant(existing.id, {
+          amountPaid: true,
+          entryType: "PAID",
+          paymentId: paymentId ?? null,
+          ...chargeFields(booking),
+        })
         afterResponse(
           {
             adminUsername: "razorpay-webhook",
@@ -155,11 +168,17 @@ export async function POST(request: NextRequest) {
       entryType: "PAID",
       paymentOrderId: orderId,
       paymentId: paymentId ?? null,
+      amountPaidPaise: booking.amountPaise,
     })
 
     if (!isNew) {
       if (!participant.amountPaid) {
-        await updateParticipant(participant.id, { amountPaid: true, entryType: "PAID", paymentId: paymentId ?? null })
+        await updateParticipant(participant.id, {
+          amountPaid: true,
+          entryType: "PAID",
+          paymentId: paymentId ?? null,
+          ...chargeFields(booking),
+        })
         after(() => requestTicketMail(participant.ticketCode, participant.email))
       }
       return NextResponse.json({ status: "ok" })

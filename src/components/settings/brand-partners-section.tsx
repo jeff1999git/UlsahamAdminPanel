@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { Plus, Trash2, Loader2, Upload, Building2 } from "lucide-react"
@@ -74,13 +74,39 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
 
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // The picked file and the cropped logo are shown through object URLs. Each
+  // is revoked as soon as it is replaced or cleared, and on unmount, so the
+  // browser frees the image instead of holding it for the life of the page.
+  const rawUrlRef = useRef<string | null>(null)
+  const previewUrlRef = useRef<string | null>(null)
+
+  function showRawImg(url: string | null) {
+    if (rawUrlRef.current && rawUrlRef.current !== url) URL.revokeObjectURL(rawUrlRef.current)
+    rawUrlRef.current = url
+    setRawImgSrc(url)
+  }
+
+  function showPreview(url: string | null) {
+    if (previewUrlRef.current && previewUrlRef.current !== url) URL.revokeObjectURL(previewUrlRef.current)
+    previewUrlRef.current = url
+    setCroppedPreview(url)
+  }
+
+  useEffect(
+    () => () => {
+      if (rawUrlRef.current) URL.revokeObjectURL(rawUrlRef.current)
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    },
+    []
+  )
+
   function resetDialog() {
     setName("")
     setSaving(false)
-    setRawImgSrc(null)
+    showRawImg(null)
     setCropOpen(false)
     setCroppedBlob(null)
-    setCroppedPreview(null)
+    showPreview(null)
     if (fileRef.current) fileRef.current.value = ""
   }
 
@@ -109,31 +135,28 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
       return
     }
 
-    // Read file as dataURL and open crop dialog
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      setRawImgSrc(ev.target?.result as string)
-      setCropOpen(true)
-    }
-    reader.readAsDataURL(file)
+    // The cropper reads the file through an object URL: a data URL would hold
+    // up to ~6.7 MB of base64 in state and in the <img>.
+    showRawImg(URL.createObjectURL(file))
+    setCropOpen(true)
   }
 
   function handleCropped(blob: Blob, previewUrl: string) {
     setCroppedBlob(blob)
-    setCroppedPreview(previewUrl)
+    showPreview(previewUrl)
     setCropOpen(false)
-    setRawImgSrc(null)
+    showRawImg(null)
   }
 
   function handleCropCancel() {
     setCropOpen(false)
-    setRawImgSrc(null)
+    showRawImg(null)
     if (fileRef.current) fileRef.current.value = ""
   }
 
   function handleRemovePreview() {
     setCroppedBlob(null)
-    setCroppedPreview(null)
+    showPreview(null)
     if (fileRef.current) fileRef.current.value = ""
   }
 
@@ -176,7 +199,7 @@ export function BrandPartnersSection({ partners: initialPartners }: BrandPartner
 
   async function handleRemove(partner: Partner) {
     try {
-      const result = await removeBrandPartnerAction(partner.id, partner.logoId)
+      const result = await removeBrandPartnerAction(partner.id)
       if (!result.success) {
         toast.error(result.error)
         return
